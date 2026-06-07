@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ClothingItem, Outfit, CanvasItem, SceneType, ClothingCategory, WearRecord, ClothingWearStats, Tag, DEFAULT_TAGS, TAG_RECOMMENDATIONS } from '@/types';
+import { ClothingItem, Outfit, CanvasItem, SceneType, ClothingCategory, WearRecord, ClothingWearStats, Tag, DEFAULT_TAGS, TAG_RECOMMENDATIONS, UserTransform, TransformCategory } from '@/types';
 import { generateId } from '@/utils/image';
 import { sceneRecommendations } from '@/data/scenes';
 
@@ -10,6 +10,9 @@ interface AppState {
   currentCanvasItems: CanvasItem[];
   wearRecords: WearRecord[];
   tags: Tag[];
+  userTransforms: UserTransform[];
+  likedTransformIds: string[];
+  favoritedTransformIds: string[];
   
   addClothingItem: (item: Omit<ClothingItem, 'id' | 'createdAt' | 'tagIds'> & { tagIds?: string[] }) => void;
   removeClothingItem: (id: string) => void;
@@ -42,6 +45,14 @@ interface AppState {
   removeTagFromClothing: (clothingId: string, tagId: string) => void;
   getClothingTags: (clothingId: string) => Tag[];
   getRecommendedTags: (category: ClothingCategory, color: string) => Tag[];
+
+  addUserTransform: (transform: Omit<UserTransform, 'id' | 'createdAt' | 'likes' | 'isLiked' | 'isFavorited' | 'isUserCreated'> & { category: TransformCategory }) => void;
+  removeUserTransform: (id: string) => void;
+  toggleLikeTransform: (transformId: string) => void;
+  toggleFavoriteTransform: (transformId: string) => void;
+  isTransformLiked: (transformId: string) => boolean;
+  isTransformFavorited: (transformId: string) => boolean;
+  getTransformLikes: (transformId: string) => number;
 }
 
 const migrateClothingItems = (items: any[]): ClothingItem[] => {
@@ -59,6 +70,9 @@ export const useStore = create<AppState>()(
       currentCanvasItems: [],
       wearRecords: [],
       tags: [],
+      userTransforms: [],
+      likedTransformIds: [],
+      favoritedTransformIds: [],
 
       addClothingItem: (item) => {
         set((state) => ({
@@ -369,6 +383,84 @@ export const useStore = create<AppState>()(
         const recommendedNames = TAG_RECOMMENDATIONS[key] || [];
         return tags.filter((tag) => recommendedNames.includes(tag.name));
       },
+
+      addUserTransform: (transform) => {
+        set((state) => ({
+          userTransforms: [
+            ...state.userTransforms,
+            {
+              ...transform,
+              id: generateId(),
+              createdAt: Date.now(),
+              likes: 0,
+              isLiked: false,
+              isFavorited: false,
+              isUserCreated: true,
+            } as UserTransform,
+          ],
+        }));
+      },
+
+      removeUserTransform: (id) => {
+        set((state) => ({
+          userTransforms: state.userTransforms.filter((t) => t.id !== id),
+          likedTransformIds: state.likedTransformIds.filter((tid) => tid !== id),
+          favoritedTransformIds: state.favoritedTransformIds.filter((tid) => tid !== id),
+        }));
+      },
+
+      toggleLikeTransform: (transformId) => {
+        set((state) => {
+          const isLiked = state.likedTransformIds.includes(transformId);
+          const newLikedIds = isLiked
+            ? state.likedTransformIds.filter((id) => id !== transformId)
+            : [...state.likedTransformIds, transformId];
+
+          const updatedTransforms = state.userTransforms.map((t) =>
+            t.id === transformId
+              ? { ...t, isLiked: !isLiked, likes: isLiked ? t.likes - 1 : t.likes + 1 }
+              : t
+          );
+
+          return {
+            likedTransformIds: newLikedIds,
+            userTransforms: updatedTransforms,
+          };
+        });
+      },
+
+      toggleFavoriteTransform: (transformId) => {
+        set((state) => {
+          const isFavorited = state.favoritedTransformIds.includes(transformId);
+          const newFavoritedIds = isFavorited
+            ? state.favoritedTransformIds.filter((id) => id !== transformId)
+            : [...state.favoritedTransformIds, transformId];
+
+          const updatedTransforms = state.userTransforms.map((t) =>
+            t.id === transformId
+              ? { ...t, isFavorited: !isFavorited }
+              : t
+          );
+
+          return {
+            favoritedTransformIds: newFavoritedIds,
+            userTransforms: updatedTransforms,
+          };
+        });
+      },
+
+      isTransformLiked: (transformId) => {
+        return get().likedTransformIds.includes(transformId);
+      },
+
+      isTransformFavorited: (transformId) => {
+        return get().favoritedTransformIds.includes(transformId);
+      },
+
+      getTransformLikes: (transformId) => {
+        const transform = get().userTransforms.find((t) => t.id === transformId);
+        return transform?.likes || 0;
+      },
     }),
     {
       name: 'wardrobe-storage',
@@ -377,6 +469,9 @@ export const useStore = create<AppState>()(
         outfits: state.outfits,
         wearRecords: state.wearRecords,
         tags: state.tags,
+        userTransforms: state.userTransforms,
+        likedTransformIds: state.likedTransformIds,
+        favoritedTransformIds: state.favoritedTransformIds,
       }),
       onRehydrateStorage: () => (state) => {
         if (state && state.clothingItems) {

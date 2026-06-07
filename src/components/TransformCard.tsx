@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Star, ChevronRight, ArrowRight, X } from 'lucide-react';
+import { Star, ChevronRight, ArrowRight, X, Heart, Bookmark, User } from 'lucide-react';
 import { TransformTemplate, TRANSFORM_CATEGORY_LABELS } from '@/types';
 import { cn } from '@/lib/utils';
+import { useStore } from '@/store/useStore';
 
 interface TransformCardProps {
   template: TransformTemplate;
@@ -12,6 +13,16 @@ export default function TransformCard({ template }: TransformCardProps) {
   const [showSteps, setShowSteps] = useState(false);
   const [beforeImageError, setBeforeImageError] = useState(false);
   const [afterImageError, setAfterImageError] = useState(false);
+
+  const toggleLikeTransform = useStore((state) => state.toggleLikeTransform);
+  const toggleFavoriteTransform = useStore((state) => state.toggleFavoriteTransform);
+  const isTransformLiked = useStore((state) => state.isTransformLiked);
+  const isTransformFavorited = useStore((state) => state.isTransformFavorited);
+  const getTransformLikes = useStore((state) => state.getTransformLikes);
+
+  const isLiked = template.isUserCreated ? isTransformLiked(template.id) : false;
+  const isFavorited = template.isUserCreated ? isTransformFavorited(template.id) : false;
+  const likeCount = template.isUserCreated ? getTransformLikes(template.id) : (template.likes || 0);
 
   useEffect(() => {
     if (!showSteps) return;
@@ -87,8 +98,8 @@ export default function TransformCard({ template }: TransformCardProps) {
 
         <div className="p-4">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="font-semibold text-earth-800">{template.title}</h3>
-            <div className="flex items-center gap-0.5">
+            <h3 className="font-semibold text-earth-800 line-clamp-1">{template.title}</h3>
+            <div className="flex items-center gap-0.5 flex-shrink-0">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Star
                   key={i}
@@ -103,16 +114,60 @@ export default function TransformCard({ template }: TransformCardProps) {
             </div>
           </div>
           <p className="text-sm text-earth-500 mt-1.5 line-clamp-2">{template.description}</p>
-          <button
-            className="flex items-center gap-1 mt-3 text-sm text-sage-600 font-medium hover:text-sage-700 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowSteps(true);
-            }}
-          >
-            查看步骤
-            <ChevronRight className="w-4 h-4" />
-          </button>
+
+          {template.isUserCreated && template.authorName && (
+            <div className="flex items-center gap-1.5 mt-2 text-xs text-earth-400">
+              <User className="w-3.5 h-3.5" />
+              <span>{template.authorName}</span>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between mt-3">
+            <button
+              className="flex items-center gap-1 text-sm text-sage-600 font-medium hover:text-sage-700 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowSteps(true);
+              }}
+            >
+              查看步骤
+              <ChevronRight className="w-4 h-4" />
+            </button>
+
+            {template.isUserCreated && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleLikeTransform(template.id);
+                  }}
+                  className={cn(
+                    'p-1.5 rounded-lg transition-colors flex items-center gap-1',
+                    isLiked
+                      ? 'text-terracotta-500 bg-terracotta-50'
+                      : 'text-earth-400 hover:text-terracotta-500 hover:bg-terracotta-50'
+                  )}
+                >
+                  <Heart className={cn('w-4 h-4', isLiked ? 'fill-terracotta-500' : '')} />
+                  <span className="text-xs">{likeCount}</span>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleFavoriteTransform(template.id);
+                  }}
+                  className={cn(
+                    'p-1.5 rounded-lg transition-colors',
+                    isFavorited
+                      ? 'text-amber-500 bg-amber-50'
+                      : 'text-earth-400 hover:text-amber-500 hover:bg-amber-50'
+                  )}
+                >
+                  <Bookmark className={cn('w-4 h-4', isFavorited ? 'fill-amber-500' : '')} />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

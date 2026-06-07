@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { Lightbulb } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Lightbulb, Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { TransformCategory, TRANSFORM_CATEGORY_LABELS } from '@/types';
 import { transformTemplates } from '@/data/transforms';
 import TransformCard from '@/components/TransformCard';
 import CategoryTag from '@/components/CategoryTag';
+import { useStore } from '@/store/useStore';
 
 const categories: (TransformCategory | 'all')[] = [
   'all',
@@ -11,24 +13,48 @@ const categories: (TransformCategory | 'all')[] = [
   'dye',
   'patchwork',
   'decorate',
+  'user',
 ];
 
 export default function Transform() {
+  const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState<TransformCategory | 'all'>('all');
+  const userTransforms = useStore((state) => state.userTransforms);
 
-  const filteredTemplates =
-    activeCategory === 'all'
-      ? transformTemplates
-      : transformTemplates.filter((t) => t.category === activeCategory);
+  const allTemplates = useMemo(() => {
+    return [
+      ...transformTemplates.map((t) => ({ ...t, isUserCreated: false })),
+      ...userTransforms,
+    ];
+  }, [userTransforms]);
+
+  const filteredTemplates = useMemo(() => {
+    if (activeCategory === 'all') {
+      return allTemplates;
+    }
+    if (activeCategory === 'user') {
+      return userTransforms;
+    }
+    return allTemplates.filter((t) => t.category === activeCategory);
+  }, [activeCategory, allTemplates, userTransforms]);
 
   return (
     <div className="min-h-screen pb-20 md:pb-8">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-serif font-bold text-earth-800">改造灵感</h1>
-          <p className="text-earth-500 mt-1">
-            简单几步，让旧衣物重获新生
-          </p>
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-3xl font-serif font-bold text-earth-800">改造灵感</h1>
+            <p className="text-earth-500 mt-1">
+              简单几步，让旧衣物重获新生
+            </p>
+          </div>
+          <button
+            onClick={() => navigate('/transform/create')}
+            className="btn-primary flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            发布改造方案
+          </button>
         </div>
 
         <div className="flex flex-wrap gap-2 mb-6">

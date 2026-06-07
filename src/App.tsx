@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Wardrobe from "@/pages/Wardrobe";
 import Transform from "@/pages/Transform";
+import TransformCreate from "@/pages/TransformCreate";
 import Styling from "@/pages/Styling";
 import Scenes from "@/pages/Scenes";
 import WearCalendar from "@/pages/WearCalendar";
@@ -18,6 +19,7 @@ export default function App() {
             <Route path="/calendar" element={<WearCalendar />} />
             <Route path="/statistics" element={<Statistics />} />
             <Route path="/transform" element={<Transform />} />
+            <Route path="/transform/create" element={<TransformCreate />} />
             <Route path="/styling" element={<Styling />} />
             <Route path="/scenes" element={<Scenes />} />
           </Routes>

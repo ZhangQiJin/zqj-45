@@ -17,7 +17,7 @@ export interface ClothingItem {
   tagIds: string[];
 }
 
-export type TransformCategory = 'cut' | 'dye' | 'patchwork' | 'decorate';
+export type TransformCategory = 'cut' | 'dye' | 'patchwork' | 'decorate' | 'user';
 
 export interface TransformTemplate {
   id: string;
@@ -28,6 +28,33 @@ export interface TransformTemplate {
   steps: string[];
   beforeImage: string;
   afterImage: string;
+  isUserCreated?: boolean;
+  outfitId?: string;
+  authorName?: string;
+  likes?: number;
+  isLiked?: boolean;
+  isFavorited?: boolean;
+  createdAt?: number;
+}
+
+export interface UserTransform extends TransformTemplate {
+  isUserCreated: true;
+  outfitId: string;
+  authorName: string;
+  likes: number;
+  isLiked: boolean;
+  isFavorited: boolean;
+  createdAt: number;
+}
+
+export interface TransformLike {
+  transformId: string;
+  userId: string;
+}
+
+export interface TransformFavorite {
+  transformId: string;
+  userId: string;
 }
 
 export type SceneType = 'class' | 'commute' | 'travel' | 'photo' | 'date';
@@ -62,6 +89,7 @@ export const TRANSFORM_CATEGORY_LABELS: Record<TransformCategory, string> = {
   dye: '染色',
   patchwork: '拼接',
   decorate: '装饰',
+  user: '用户创作',
 };
 
 export const SCENE_LABELS: Record<SceneType, string> = {
