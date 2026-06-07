@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Lightbulb, Plus } from 'lucide-react';
+import { Lightbulb, Plus, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { TransformCategory, TRANSFORM_CATEGORY_LABELS } from '@/types';
 import { transformTemplates } from '@/data/transforms';
 import TransformCard from '@/components/TransformCard';
 import CategoryTag from '@/components/CategoryTag';
+import Empty from '@/components/Empty';
 import { useStore } from '@/store/useStore';
 
 const categories: (TransformCategory | 'all')[] = [
@@ -69,11 +70,34 @@ export default function Transform() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {filteredTemplates.map((template) => (
-            <TransformCard key={template.id} template={template} />
-          ))}
-        </div>
+        {filteredTemplates.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {filteredTemplates.map((template) => (
+              <TransformCard key={template.id} template={template} />
+            ))}
+          </div>
+        ) : activeCategory === 'user' ? (
+          <Empty
+            icon={<Sparkles className="w-8 h-8" />}
+            title="还没有用户创作的改造方案"
+            description="成为第一个分享创意的人吧！把你的改造灵感分享给更多人"
+            action={
+              <button
+                onClick={() => navigate('/transform/create')}
+                className="btn-primary flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                发布第一个改造方案
+              </button>
+            }
+          />
+        ) : (
+          <Empty
+            icon={<Lightbulb className="w-8 h-8" />}
+            title="该分类下暂无方案"
+            description="换个分类看看，或者发布你自己的改造方案吧"
+          />
+        )}
 
         <div className="mt-12 p-6 bg-gradient-to-r from-sage-50 to-terracotta-50 rounded-2xl">
           <div className="flex items-start gap-4">
