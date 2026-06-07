@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Lightbulb, Plus, Sparkles } from 'lucide-react';
+import { Lightbulb, Plus, Sparkles, Bookmark } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { TransformCategory, TRANSFORM_CATEGORY_LABELS } from '@/types';
 import { transformTemplates } from '@/data/transforms';
@@ -8,19 +8,21 @@ import CategoryTag from '@/components/CategoryTag';
 import Empty from '@/components/Empty';
 import { useStore } from '@/store/useStore';
 
-const categories: (TransformCategory | 'all')[] = [
+const categories: (TransformCategory | 'all' | 'favorites')[] = [
   'all',
   'cut',
   'dye',
   'patchwork',
   'decorate',
   'user',
+  'favorites',
 ];
 
 export default function Transform() {
   const navigate = useNavigate();
-  const [activeCategory, setActiveCategory] = useState<TransformCategory | 'all'>('all');
+  const [activeCategory, setActiveCategory] = useState<TransformCategory | 'all' | 'favorites'>('all');
   const userTransforms = useStore((state) => state.userTransforms);
+  const isTransformFavorited = useStore((state) => state.isTransformFavorited);
 
   const allTemplates = useMemo(() => {
     return [
@@ -36,8 +38,11 @@ export default function Transform() {
     if (activeCategory === 'user') {
       return userTransforms;
     }
+    if (activeCategory === 'favorites') {
+      return allTemplates.filter((t) => isTransformFavorited(t.id));
+    }
     return allTemplates.filter((t) => t.category === activeCategory);
-  }, [activeCategory, allTemplates, userTransforms]);
+  }, [activeCategory, allTemplates, userTransforms, isTransformFavorited]);
 
   return (
     <div className="min-h-screen pb-20 md:pb-8">
@@ -62,10 +67,11 @@ export default function Transform() {
           {categories.map((cat) => (
             <CategoryTag
               key={cat}
-              label={cat === 'all' ? '全部' : TRANSFORM_CATEGORY_LABELS[cat]}
+              label={cat === 'all' ? '全部' : cat === 'favorites' ? '我的收藏' : TRANSFORM_CATEGORY_LABELS[cat]}
               active={activeCategory === cat}
               onClick={() => setActiveCategory(cat)}
-              color="terracotta"
+              color={cat === 'favorites' ? 'amber' : 'terracotta'}
+              icon={cat === 'favorites' ? <Bookmark className="w-3.5 h-3.5" /> : undefined}
             />
           ))}
         </div>
@@ -90,6 +96,12 @@ export default function Transform() {
                 发布第一个改造方案
               </button>
             }
+          />
+        ) : activeCategory === 'favorites' ? (
+          <Empty
+            icon={<Bookmark className="w-8 h-8" />}
+            title="还没有收藏的改造方案"
+            description="浏览改造灵感，点击收藏按钮保存你喜欢的方案吧"
           />
         ) : (
           <Empty

@@ -57,6 +57,20 @@ export interface TransformFavorite {
   userId: string;
 }
 
+export interface TransformStepProgress {
+  stepIndex: number;
+  completed: boolean;
+  note?: string;
+  completedAt?: number;
+}
+
+export interface TransformExecution {
+  transformId: string;
+  stepProgress: TransformStepProgress[];
+  startedAt: number;
+  completedAt?: number;
+}
+
 export type SceneType = 'class' | 'commute' | 'travel' | 'photo' | 'date';
 
 export interface Outfit {

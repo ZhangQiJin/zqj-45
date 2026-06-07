@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ClothingItem, Outfit, CanvasItem, SceneType, ClothingCategory, WearRecord, ClothingWearStats, Tag, DEFAULT_TAGS, TAG_RECOMMENDATIONS, UserTransform, TransformCategory } from '@/types';
+import { ClothingItem, Outfit, CanvasItem, SceneType, ClothingCategory, WearRecord, ClothingWearStats, Tag, DEFAULT_TAGS, TAG_RECOMMENDATIONS, UserTransform, TransformCategory, TransformExecution } from '@/types';
 import { generateId } from '@/utils/image';
 import { sceneRecommendations } from '@/data/scenes';
 
@@ -13,6 +13,7 @@ interface AppState {
   userTransforms: UserTransform[];
   likedTransformIds: string[];
   favoritedTransformIds: string[];
+  transformExecutions: TransformExecution[];
   
   addClothingItem: (item: Omit<ClothingItem, 'id' | 'createdAt' | 'tagIds'> & { tagIds?: string[] }) => void;
   removeClothingItem: (id: string) => void;
@@ -53,6 +54,13 @@ interface AppState {
   isTransformLiked: (transformId: string) => boolean;
   isTransformFavorited: (transformId: string) => boolean;
   getTransformLikes: (transformId: string) => number;
+
+  startTransformExecution: (transformId: string, totalSteps: number) => void;
+  updateStepProgress: (transformId: string, stepIndex: number, completed: boolean, note?: string) => void;
+  getTransformExecution: (transformId: string) => TransformExecution | undefined;
+  getTransformProgress: (transformId: string) => number;
+  isTransformCompleted: (transformId: string) => boolean;
+  removeTransformExecution: (transformId: string) => void;
 }
 
 const migrateClothingItems = (items: any[]): ClothingItem[] => {
@@ -73,6 +81,7 @@ export const useStore = create<AppState>()(
       userTransforms: [],
       likedTransformIds: [],
       favoritedTransformIds: [],
+      transformExecutions: [],
 
       addClothingItem: (item) => {
         set((state) => ({
@@ -461,6 +470,80 @@ export const useStore = create<AppState>()(
         const transform = get().userTransforms.find((t) => t.id === transformId);
         return transform?.likes || 0;
       },
+
+      startTransformExecution: (transformId, totalSteps) => {
+        set((state) => {
+          const existing = state.transformExecutions.find((e) => e.transformId === transformId);
+          if (existing) return state;
+
+          const stepProgress = Array.from({ length: totalSteps }, (_, i) => ({
+            stepIndex: i,
+            completed: false,
+          }));
+
+          return {
+            transformExecutions: [
+              ...state.transformExecutions,
+              {
+                transformId,
+                stepProgress,
+                startedAt: Date.now(),
+              },
+            ],
+          };
+        });
+      },
+
+      updateStepProgress: (transformId, stepIndex, completed, note) => {
+        set((state) => {
+          const updatedExecutions = state.transformExecutions.map((execution) => {
+            if (execution.transformId !== transformId) return execution;
+
+            const updatedStepProgress = execution.stepProgress.map((step) => {
+              if (step.stepIndex !== stepIndex) return step;
+              return {
+                ...step,
+                completed,
+                note: note !== undefined ? note : step.note,
+                completedAt: completed ? Date.now() : undefined,
+              };
+            });
+
+            const allCompleted = updatedStepProgress.every((step) => step.completed);
+
+            return {
+              ...execution,
+              stepProgress: updatedStepProgress,
+              completedAt: allCompleted ? Date.now() : undefined,
+            };
+          });
+
+          return { transformExecutions: updatedExecutions };
+        });
+      },
+
+      getTransformExecution: (transformId) => {
+        return get().transformExecutions.find((e) => e.transformId === transformId);
+      },
+
+      getTransformProgress: (transformId) => {
+        const execution = get().transformExecutions.find((e) => e.transformId === transformId);
+        if (!execution || execution.stepProgress.length === 0) return 0;
+        const completedSteps = execution.stepProgress.filter((step) => step.completed).length;
+        return (completedSteps / execution.stepProgress.length) * 100;
+      },
+
+      isTransformCompleted: (transformId) => {
+        const execution = get().transformExecutions.find((e) => e.transformId === transformId);
+        if (!execution) return false;
+        return execution.stepProgress.every((step) => step.completed);
+      },
+
+      removeTransformExecution: (transformId) => {
+        set((state) => ({
+          transformExecutions: state.transformExecutions.filter((e) => e.transformId !== transformId),
+        }));
+      },
     }),
     {
       name: 'wardrobe-storage',
@@ -472,6 +555,7 @@ export const useStore = create<AppState>()(
         userTransforms: state.userTransforms,
         likedTransformIds: state.likedTransformIds,
         favoritedTransformIds: state.favoritedTransformIds,
+        transformExecutions: state.transformExecutions,
       }),
       onRehydrateStorage: () => (state) => {
         if (state && state.clothingItems) {
