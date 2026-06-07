@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom';
-import { Shirt, Scissors, Palette, Sparkles, Calendar } from 'lucide-react';
+import { Shirt, Scissors, Palette, Sparkles, Calendar, BarChart3 } from 'lucide-react';
 
 const navItems = [
   { path: '/', label: '我的衣橱', icon: Shirt },
   { path: '/calendar', label: '穿着日历', icon: Calendar },
+  { path: '/statistics', label: '数据统计', icon: BarChart3 },
   { path: '/transform', label: '改造灵感', icon: Scissors },
   { path: '/styling', label: '搭配试排', icon: Palette },
   { path: '/scenes', label: '场景推荐', icon: Sparkles },
