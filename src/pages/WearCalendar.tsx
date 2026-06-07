@@ -5,13 +5,6 @@ import CalendarHeatmap from '@/components/CalendarHeatmap';
 import WearRecordDetail from '@/components/WearRecordDetail';
 import { CATEGORY_LABELS } from '@/types';
 
-function formatDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 function getDaysAgo(dateStr: string): number {
   const date = new Date(dateStr);
   const today = new Date();
@@ -22,15 +15,67 @@ function getDaysAgo(dateStr: string): number {
   return diffDays;
 }
 
+interface ClothingImageProps {
+  src: string;
+  alt: string;
+  className?: string;
+}
+
+function ClothingImage({ src, alt, className }: ClothingImageProps) {
+  const [imageError, setImageError] = useState(false);
+
+  if (imageError) {
+    return (
+      <div className={`${className} flex items-center justify-center bg-earth-100 text-earth-400`}>
+        <span className="text-2xl">👕</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      onError={() => setImageError(true)}
+    />
+  );
+}
+
 export default function WearCalendar() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const clothingItems = useStore((state) => state.clothingItems);
   const wearRecords = useStore((state) => state.wearRecords);
-  const getAllClothingWearStats = useStore((state) => state.getAllClothingWearStats);
 
-  const stats = useMemo(() => getAllClothingWearStats(), [getAllClothingWearStats]);
+  const stats = useMemo(() => {
+    const statsMap = new Map();
+    
+    clothingItems.forEach((item) => {
+      statsMap.set(item.id, {
+        clothingId: item.id,
+        totalWears: 0,
+        lastWornDate: null,
+        wearDates: [],
+      });
+    });
+
+    wearRecords.forEach((record) => {
+      record.clothingIds.forEach((clothingId) => {
+        const existing = statsMap.get(clothingId);
+        if (existing) {
+          existing.totalWears += 1;
+          existing.wearDates.push(record.date);
+          if (!existing.lastWornDate || record.date > existing.lastWornDate) {
+            existing.lastWornDate = record.date;
+          }
+        }
+      });
+    });
+
+    return statsMap;
+  }, [clothingItems, wearRecords]);
 
   const sortedByWearCount = useMemo(() => {
     return clothingItems
@@ -130,7 +175,7 @@ export default function WearCalendar() {
                 <div className="space-y-3">
                   {mostWorn.map(({ item, stats }) => (
                     <div key={item.id} className="flex items-center gap-3">
-                      <img
+                      <ClothingImage
                         src={item.imageUrl}
                         alt={item.name}
                         className="w-12 h-12 rounded-lg object-cover"
@@ -166,7 +211,7 @@ export default function WearCalendar() {
                 <div className="space-y-3">
                   {leastWorn.map(({ item, stats }) => (
                     <div key={item.id} className="flex items-center gap-3">
-                      <img
+                      <ClothingImage
                         src={item.imageUrl}
                         alt={item.name}
                         className="w-12 h-12 rounded-lg object-cover"
@@ -201,12 +246,11 @@ export default function WearCalendar() {
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {notWorn.slice(0, 8).map(({ item }) => (
-                    <img
+                    <ClothingImage
                       key={item.id}
                       src={item.imageUrl}
                       alt={item.name}
                       className="w-12 h-12 rounded-lg object-cover border border-earth-200"
-                      title={item.name}
                     />
                   ))}
                   {notWorn.length > 8 && (

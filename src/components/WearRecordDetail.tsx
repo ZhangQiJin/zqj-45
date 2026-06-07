@@ -20,6 +20,33 @@ const categories: (ClothingCategory | 'all')[] = [
   'accessory',
 ];
 
+interface ClothingImageProps {
+  src: string;
+  alt: string;
+  className?: string;
+}
+
+function ClothingImage({ src, alt, className }: ClothingImageProps) {
+  const [imageError, setImageError] = useState(false);
+
+  if (imageError) {
+    return (
+      <div className={`${className} flex items-center justify-center bg-earth-100 text-earth-400`}>
+        <span className="text-2xl">👕</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      onError={() => setImageError(true)}
+    />
+  );
+}
+
 function formatDisplayDate(dateStr: string): string {
   const date = new Date(dateStr);
   const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
@@ -36,6 +63,7 @@ export default function WearRecordDetail({ date, isOpen, onClose }: WearRecordDe
   const [isEditing, setIsEditing] = useState(false);
 
   const clothingItems = useStore((state) => state.clothingItems);
+  const wearRecords = useStore((state) => state.wearRecords);
   const addWearRecord = useStore((state) => state.addWearRecord);
   const removeWearRecord = useStore((state) => state.removeWearRecord);
   const getWearRecordsByDate = useStore((state) => state.getWearRecordsByDate);
@@ -54,7 +82,25 @@ export default function WearRecordDetail({ date, isOpen, onClose }: WearRecordDe
         setIsEditing(true);
       }
     }
-  }, [date, isOpen, getWearRecordsByDate]);
+  }, [date, isOpen, getWearRecordsByDate, wearRecords]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -141,7 +187,7 @@ export default function WearRecordDetail({ date, isOpen, onClose }: WearRecordDe
                           onClick={() => toggleClothing(item.id)}
                           className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all ${isSelected ? 'border-sage-500 ring-2 ring-sage-200' : 'border-earth-200 hover:border-earth-300'}`}
                         >
-                          <img
+                          <ClothingImage
                             src={item.imageUrl}
                             alt={item.name}
                             className="w-full h-full object-cover"
@@ -151,10 +197,10 @@ export default function WearRecordDetail({ date, isOpen, onClose }: WearRecordDe
                               <Check className="w-3 h-3 text-white" />
                             </div>
                           )}
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/50 px-1 py-0.5">
-                            <p className="text-white text-xs truncate">{item.name}</p>
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-2 pt-6 pb-1.5">
+                            <p className="text-white text-xs font-medium truncate">{item.name}</p>
                             {stats.totalWears > 0 && (
-                              <p className="text-white/70 text-[10px]">已穿{stats.totalWears}次</p>
+                              <p className="text-white/80 text-[10px]">已穿{stats.totalWears}次</p>
                             )}
                           </div>
                         </button>
@@ -187,16 +233,16 @@ export default function WearRecordDetail({ date, isOpen, onClose }: WearRecordDe
                       return (
                         <div
                           key={id}
-                          className="aspect-square rounded-xl overflow-hidden border border-earth-200"
+                          className="relative aspect-square rounded-xl overflow-hidden border border-earth-200"
                         >
-                          <img
+                          <ClothingImage
                             src={item.imageUrl}
                             alt={item.name}
                             className="w-full h-full object-cover"
                           />
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/50 px-1 py-0.5">
-                            <p className="text-white text-xs truncate">{item.name}</p>
-                            <p className="text-white/70 text-[10px]">共穿{stats.totalWears}次</p>
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-2 pt-6 pb-1.5">
+                            <p className="text-white text-xs font-medium truncate">{item.name}</p>
+                            <p className="text-white/80 text-[10px]">共穿{stats.totalWears}次</p>
                           </div>
                         </div>
                       );
