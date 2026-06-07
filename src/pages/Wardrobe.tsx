@@ -51,9 +51,10 @@ export default function Wardrobe() {
 
   const filteredItems = clothingItems.filter((item) => {
     const categoryMatch = activeCategory === 'all' || item.category === activeCategory;
+    const itemTagIds = item.tagIds || [];
     const tagsMatch =
       selectedTagIds.length === 0 ||
-      selectedTagIds.every((tagId) => item.tagIds.includes(tagId));
+      selectedTagIds.every((tagId) => itemTagIds.includes(tagId));
     return categoryMatch && tagsMatch;
   });
 

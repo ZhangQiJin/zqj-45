@@ -44,6 +44,13 @@ interface AppState {
   getRecommendedTags: (category: ClothingCategory, color: string) => Tag[];
 }
 
+const migrateClothingItems = (items: any[]): ClothingItem[] => {
+  return items.map((item) => ({
+    ...item,
+    tagIds: Array.isArray(item.tagIds) ? item.tagIds : [],
+  }));
+};
+
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -313,7 +320,7 @@ export const useStore = create<AppState>()(
           tags: state.tags.filter((tag) => tag.id !== id),
           clothingItems: state.clothingItems.map((item) => ({
             ...item,
-            tagIds: item.tagIds.filter((tid) => tid !== id),
+            tagIds: (item.tagIds || []).filter((tid) => tid !== id),
           })),
         }));
       },
@@ -329,11 +336,12 @@ export const useStore = create<AppState>()(
 
       addTagToClothing: (clothingId, tagId) => {
         set((state) => ({
-          clothingItems: state.clothingItems.map((item) =>
-            item.id === clothingId && !item.tagIds.includes(tagId)
-              ? { ...item, tagIds: [...item.tagIds, tagId] }
-              : item
-          ),
+          clothingItems: state.clothingItems.map((item) => {
+            if (item.id !== clothingId) return item;
+            const currentTagIds = item.tagIds || [];
+            if (currentTagIds.includes(tagId)) return item;
+            return { ...item, tagIds: [...currentTagIds, tagId] };
+          }),
         }));
       },
 
@@ -341,7 +349,7 @@ export const useStore = create<AppState>()(
         set((state) => ({
           clothingItems: state.clothingItems.map((item) =>
             item.id === clothingId
-              ? { ...item, tagIds: item.tagIds.filter((tid) => tid !== tagId) }
+              ? { ...item, tagIds: (item.tagIds || []).filter((tid) => tid !== tagId) }
               : item
           ),
         }));
@@ -351,7 +359,8 @@ export const useStore = create<AppState>()(
         const { clothingItems, tags } = get();
         const item = clothingItems.find((i) => i.id === clothingId);
         if (!item) return [];
-        return tags.filter((tag) => item.tagIds.includes(tag.id));
+        const itemTagIds = item.tagIds || [];
+        return tags.filter((tag) => itemTagIds.includes(tag.id));
       },
 
       getRecommendedTags: (category, color) => {
@@ -369,6 +378,11 @@ export const useStore = create<AppState>()(
         wearRecords: state.wearRecords,
         tags: state.tags,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state && state.clothingItems) {
+          state.clothingItems = migrateClothingItems(state.clothingItems as any[]);
+        }
+      },
     }
   )
 );
