@@ -43,17 +43,19 @@ export default function Styling() {
   }, [baseItem, clothingItems, canvasItemIds]);
 
   useEffect(() => {
-    if (currentCanvasItems.length === 0) {
-      setBaseItem(null);
+    if (baseItem) {
+      const stillExists = clothingItems.find((c) => c.id === baseItem.id);
+      if (!stillExists) {
+        setBaseItem(null);
+      }
       return;
     }
-    if (baseItem && currentCanvasItems.find((c) => c.clothingId === baseItem.id)) {
-      return;
-    }
-    const firstCanvasItemId = currentCanvasItems[0]?.clothingId;
-    const firstItem = clothingItems.find((c) => c.id === firstCanvasItemId);
-    if (firstItem) {
-      setBaseItem(firstItem);
+    if (currentCanvasItems.length > 0) {
+      const firstCanvasItemId = currentCanvasItems[0]?.clothingId;
+      const firstItem = clothingItems.find((c) => c.id === firstCanvasItemId);
+      if (firstItem) {
+        setBaseItem(firstItem);
+      }
     }
   }, [currentCanvasItems, clothingItems, baseItem]);
 

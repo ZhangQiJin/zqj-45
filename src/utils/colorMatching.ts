@@ -71,8 +71,8 @@ export function isAnalogous(h1: number, h2: number): boolean {
   return hueDistance(h1, h2) <= 45;
 }
 
-export function isMonochromatic(s1: number, s2: number, l1: number, l2: number): boolean {
-  return Math.abs(s1 - s2) <= 20 && Math.abs(l1 - l2) <= 30;
+export function isMonochromatic(h1: number, h2: number, s1: number, s2: number, l1: number, l2: number): boolean {
+  return hueDistance(h1, h2) <= 20 && Math.abs(s1 - s2) <= 25 && Math.abs(l1 - l2) <= 35;
 }
 
 export function isTriadic(h1: number, h2: number): boolean {
@@ -137,7 +137,7 @@ export function calculateColorMatch(
     };
   }
 
-  if (isMonochromatic(baseColor.saturation, targetColor.saturation, baseColor.lightness, targetColor.lightness)) {
+  if (isMonochromatic(baseColor.hue, targetColor.hue, baseColor.saturation, targetColor.saturation, baseColor.lightness, targetColor.lightness)) {
     return {
       score: 82,
       matchType: 'monochromatic',
