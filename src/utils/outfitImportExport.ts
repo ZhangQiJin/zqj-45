@@ -1,4 +1,4 @@
-import { ExportData, EXPORT_DATA_VERSION, Outfit, ClothingItem, Tag } from '@/types';
+import { ExportData, EXPORT_DATA_VERSION, Outfit, ClothingItem, Tag, UserPreferences } from '@/types';
 
 export interface ValidationResult {
   valid: boolean;
@@ -30,10 +30,10 @@ export const validateExportData = (data: unknown): ValidationResult => {
     };
   }
 
-  if (obj.version < EXPORT_DATA_VERSION) {
+  if (obj.version < 1 || obj.version > EXPORT_DATA_VERSION) {
     return {
       valid: false,
-      error: `版本不兼容：文件版本为 ${obj.version}，当前应用版本为 ${EXPORT_DATA_VERSION}。该旧版本文件不再支持。`,
+      error: `版本不兼容：文件版本为 ${obj.version}，当前应用支持的版本范围为 1-${EXPORT_DATA_VERSION}。`,
     };
   }
 
@@ -82,7 +82,8 @@ export const validateExportData = (data: unknown): ValidationResult => {
 export const exportOutfits = (
   outfits: Outfit[],
   clothingItems: ClothingItem[],
-  tags: Tag[]
+  tags: Tag[],
+  userPreferences?: UserPreferences
 ): void => {
   const data: ExportData = {
     version: EXPORT_DATA_VERSION,
@@ -90,6 +91,7 @@ export const exportOutfits = (
     outfits,
     clothingItems,
     tags,
+    userPreferences,
   };
 
   const jsonStr = JSON.stringify(data, null, 2);
@@ -139,6 +141,8 @@ export interface PreviewImportResult {
   existingOutfitsCount: number;
   existingClothingCount: number;
   existingTagsCount: number;
+  hasUserPreferences: boolean;
+  preferenceFeedbacksCount: number;
 }
 
 export const getPreviewImportData = (
@@ -157,5 +161,7 @@ export const getPreviewImportData = (
     existingOutfitsCount: 0,
     existingClothingCount,
     existingTagsCount,
+    hasUserPreferences: !!data.userPreferences,
+    preferenceFeedbacksCount: data.userPreferences?.totalFeedbacks || 0,
   };
 };

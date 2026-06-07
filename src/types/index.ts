@@ -100,7 +100,7 @@ export interface OutfitCanvasItem {
   zIndex: number;
 }
 
-export const EXPORT_DATA_VERSION = 1;
+export const EXPORT_DATA_VERSION = 2;
 
 export interface ExportData {
   version: number;
@@ -108,6 +108,7 @@ export interface ExportData {
   outfits: Outfit[];
   clothingItems: ClothingItem[];
   tags: Tag[];
+  userPreferences?: UserPreferences;
 }
 
 export const CATEGORY_LABELS: Record<ClothingCategory, string> = {

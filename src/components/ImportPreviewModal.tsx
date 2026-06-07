@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { X, Check, AlertCircle, FileJson, Shirt, Tags, Palette } from 'lucide-react';
+import { X, Check, AlertCircle, FileJson, Shirt, Tags, Palette, Heart } from 'lucide-react';
 import { ExportData, CATEGORY_LABELS, ClothingItem } from '@/types';
 
 interface ImportPreviewModalProps {
@@ -109,7 +109,7 @@ export default function ImportPreviewModal({
         </div>
 
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-sage-50 rounded-xl p-4 text-center">
               <div className="w-10 h-10 mx-auto rounded-lg bg-sage-100 flex items-center justify-center mb-2">
                 <Palette className="w-5 h-5 text-sage-600" />
@@ -143,6 +143,17 @@ export default function ImportPreviewModal({
                 )}
               </p>
             </div>
+            {data.userPreferences && (
+              <div className="bg-rose-50 rounded-xl p-4 text-center">
+                <div className="w-10 h-10 mx-auto rounded-lg bg-rose-100 flex items-center justify-center mb-2">
+                  <Heart className="w-5 h-5 text-rose-600" />
+                </div>
+                <p className="text-2xl font-bold text-rose-700">{data.userPreferences.totalFeedbacks}</p>
+                <p className="text-sm text-rose-600">
+                  偏好反馈
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="mb-4">
@@ -227,7 +238,8 @@ export default function ImportPreviewModal({
                 <ul className="space-y-1 list-disc list-inside text-amber-700">
                   <li>ID相同的衣物和名称相同的标签会自动跳过，不会重复导入</li>
                   <li>导入的搭配方案会作为新方案添加，不会覆盖现有方案</li>
-                  <li>导入后可在「搭配试排」页面查看和使用</li>
+                  <li>场景推荐偏好数据会与现有数据合并，累计统计次数</li>
+                  <li>导入后可在「搭配试排」和「场景推荐」页面查看和使用</li>
                 </ul>
               </div>
             </div>

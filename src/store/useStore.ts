@@ -367,8 +367,8 @@ export const useStore = create<AppState>()(
               }
             }
 
-            const accessoryChance = scenePref ? 0.5 : 0.8;
-            if (suggestedCategories.includes('accessory') && Math.random() > accessoryChance) {
+            const accessoryProbability = scenePref ? 0.85 : 0.8;
+            if (suggestedCategories.includes('accessory') && Math.random() < accessoryProbability) {
               const accessory = getWeightedRandomItem('accessory', result);
               if (accessory) {
                 result.push(accessory);
@@ -815,10 +815,60 @@ export const useStore = create<AppState>()(
             };
           });
 
+          let mergedPreferences = state.userPreferences;
+          if (data.userPreferences) {
+            const importedPrefs = data.userPreferences;
+            const mergedScenePrefs = [...state.userPreferences.scenePreferences];
+            
+            importedPrefs.scenePreferences.forEach((importedScenePref) => {
+              const existingIndex = mergedScenePrefs.findIndex(
+                (sp) => sp.scene === importedScenePref.scene
+              );
+              
+              if (existingIndex === -1) {
+                mergedScenePrefs.push({ ...importedScenePref });
+              } else {
+                const existingPref = mergedScenePrefs[existingIndex];
+                
+                importedScenePref.categoryPreferences.forEach((importedCatPref) => {
+                  const catIndex = existingPref.categoryPreferences.findIndex(
+                    (cp) =>
+                      cp.categories.length === importedCatPref.categories.length &&
+                      cp.categories.every((c, idx) => c === importedCatPref.categories[idx])
+                  );
+                  if (catIndex === -1) {
+                    existingPref.categoryPreferences.push({ ...importedCatPref });
+                  } else {
+                    existingPref.categoryPreferences[catIndex].count += importedCatPref.count;
+                  }
+                });
+                
+                importedScenePref.colorPairPreferences.forEach((importedColorPref) => {
+                  const colorIndex = existingPref.colorPairPreferences.findIndex(
+                    (cp) =>
+                      (cp.color1 === importedColorPref.color1 && cp.color2 === importedColorPref.color2) ||
+                      (cp.color1 === importedColorPref.color2 && cp.color2 === importedColorPref.color1)
+                  );
+                  if (colorIndex === -1) {
+                    existingPref.colorPairPreferences.push({ ...importedColorPref });
+                  } else {
+                    existingPref.colorPairPreferences[colorIndex].count += importedColorPref.count;
+                  }
+                });
+              }
+            });
+            
+            mergedPreferences = {
+              scenePreferences: mergedScenePrefs,
+              totalFeedbacks: state.userPreferences.totalFeedbacks + importedPrefs.totalFeedbacks,
+            };
+          }
+
           return {
             tags: [...state.tags, ...newTags],
             clothingItems: [...state.clothingItems, ...newClothingItems],
             outfits: [...state.outfits, ...newOutfits],
+            userPreferences: mergedPreferences,
           };
         });
       },

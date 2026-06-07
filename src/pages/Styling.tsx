@@ -47,6 +47,7 @@ export default function Styling() {
   const clothingItems = useStore((state) => state.clothingItems);
   const outfits = useStore((state) => state.outfits);
   const tags = useStore((state) => state.tags);
+  const userPreferences = useStore((state) => state.userPreferences);
   const currentCanvasItems = useStore((state) => state.currentCanvasItems);
   const addToCanvas = useStore((state) => state.addToCanvas);
   const updateCanvasItems = useStore((state) => state.updateCanvasItems);
@@ -357,7 +358,7 @@ export default function Styling() {
     const relatedClothingItems = clothingItems.filter((c) => outfitIds.has(c.id));
     const tagIds = new Set(relatedClothingItems.flatMap((c) => c.tagIds || []));
     const relatedTags = tags.filter((t) => tagIds.has(t.id));
-    exportOutfits(outfits, relatedClothingItems, relatedTags);
+    exportOutfits(outfits, relatedClothingItems, relatedTags, userPreferences);
   };
 
   const handleImportClick = () => {
