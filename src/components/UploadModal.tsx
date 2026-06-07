@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
-import { X, Upload, Image as ImageIcon } from 'lucide-react';
-import { ClothingCategory, CATEGORY_LABELS, COLOR_OPTIONS } from '@/types';
+import { X, Upload, Image as ImageIcon, Check, Sparkles } from 'lucide-react';
+import { ClothingCategory, CATEGORY_LABELS, COLOR_OPTIONS, TAG_COLORS, Tag } from '@/types';
 import { useStore } from '@/store/useStore';
 import { compressImage } from '@/utils/image';
+import { cn } from '@/lib/utils';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -16,24 +17,35 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
   const [imageUrl, setImageUrl] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const addClothingItem = useStore((state) => state.addClothingItem);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const { addClothingItem, tags, getRecommendedTags } = useStore();
 
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setName('');
-        setCategory('top');
-        setColor('白色');
-        setImageUrl('');
-        onClose();
+        resetAndClose();
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+  const recommendedTags = getRecommendedTags(category, color);
+  const recommendedTagIds = new Set(recommendedTags.map((t) => t.id));
+
+  const getColorClasses = (colorValue: string) => {
+    const color = TAG_COLORS.find((c) => c.value === colorValue);
+    return color || TAG_COLORS[0];
+  };
+
+  const toggleTag = (tagId: string) => {
+    setSelectedTagIds((prev) =>
+      prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
+    );
+  };
 
   const handleFile = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -81,12 +93,9 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
       category,
       color,
       imageUrl,
+      tagIds: selectedTagIds,
     });
-    setName('');
-    setCategory('top');
-    setColor('白色');
-    setImageUrl('');
-    onClose();
+    resetAndClose();
   };
 
   const resetAndClose = () => {
@@ -94,6 +103,7 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
     setCategory('top');
     setColor('白色');
     setImageUrl('');
+    setSelectedTagIds([]);
     onClose();
   };
 
@@ -230,6 +240,73 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
               ))}
             </select>
           </div>
+
+          {tags.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-earth-700 mb-1.5">
+                标签
+                {selectedTagIds.length > 0 && (
+                  <span className="text-xs font-normal text-earth-500 ml-2">
+                    已选 {selectedTagIds.length} 个
+                  </span>
+                )}
+              </label>
+              {recommendedTags.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-xs text-earth-500 mb-2 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-sage-500" />
+                    智能推荐
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {recommendedTags.map((tag) => {
+                      const isSelected = selectedTagIds.includes(tag.id);
+                      const colorClasses = getColorClasses(tag.color);
+                      return (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => toggleTag(tag.id)}
+                          className={cn(
+                            'px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-200 flex items-center gap-1',
+                            isSelected
+                              ? `${colorClasses.bg} ${colorClasses.text} ring-1 ring-offset-1 ${colorClasses.border.replace('border-', 'ring-')}`
+                              : 'bg-earth-100 text-earth-500 hover:bg-earth-200 ring-1 ring-dashed ring-sage-300'
+                          )}
+                        >
+                          {isSelected && <Check className="w-3 h-3" />}
+                          {tag.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div className="flex flex-wrap gap-1.5">
+                {tags
+                  .filter((tag) => !recommendedTagIds.has(tag.id))
+                  .map((tag) => {
+                    const isSelected = selectedTagIds.includes(tag.id);
+                    const colorClasses = getColorClasses(tag.color);
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => toggleTag(tag.id)}
+                        className={cn(
+                          'px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-200 flex items-center gap-1',
+                          isSelected
+                            ? `${colorClasses.bg} ${colorClasses.text} ring-1 ring-offset-1 ${colorClasses.border.replace('border-', 'ring-')}`
+                            : 'bg-earth-100 text-earth-500 hover:bg-earth-200'
+                        )}
+                      >
+                        {isSelected && <Check className="w-3 h-3" />}
+                        {tag.name}
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-3 pt-2">
             <button

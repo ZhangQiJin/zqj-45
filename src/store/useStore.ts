@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ClothingItem, Outfit, CanvasItem, SceneType, ClothingCategory, WearRecord, ClothingWearStats } from '@/types';
+import { ClothingItem, Outfit, CanvasItem, SceneType, ClothingCategory, WearRecord, ClothingWearStats, Tag, DEFAULT_TAGS, TAG_RECOMMENDATIONS } from '@/types';
 import { generateId } from '@/utils/image';
 import { sceneRecommendations } from '@/data/scenes';
 
@@ -9,9 +9,11 @@ interface AppState {
   outfits: Outfit[];
   currentCanvasItems: CanvasItem[];
   wearRecords: WearRecord[];
+  tags: Tag[];
   
-  addClothingItem: (item: Omit<ClothingItem, 'id' | 'createdAt'>) => void;
+  addClothingItem: (item: Omit<ClothingItem, 'id' | 'createdAt' | 'tagIds'> & { tagIds?: string[] }) => void;
   removeClothingItem: (id: string) => void;
+  updateClothingItem: (id: string, updates: Partial<Omit<ClothingItem, 'id' | 'createdAt'>>) => void;
   
   addOutfit: (outfit: Omit<Outfit, 'id' | 'createdAt'>) => void;
   removeOutfit: (id: string) => void;
@@ -30,6 +32,16 @@ interface AppState {
   getWearRecordsByClothingId: (clothingId: string) => WearRecord[];
   getClothingWearStats: (clothingId: string) => ClothingWearStats;
   getAllClothingWearStats: () => Map<string, ClothingWearStats>;
+
+  addTag: (tag: Omit<Tag, 'id' | 'createdAt'>) => void;
+  updateTag: (id: string, updates: Partial<Omit<Tag, 'id' | 'createdAt'>>) => void;
+  removeTag: (id: string) => void;
+  initializeDefaultTags: () => void;
+  
+  addTagToClothing: (clothingId: string, tagId: string) => void;
+  removeTagFromClothing: (clothingId: string, tagId: string) => void;
+  getClothingTags: (clothingId: string) => Tag[];
+  getRecommendedTags: (category: ClothingCategory, color: string) => Tag[];
 }
 
 export const useStore = create<AppState>()(
@@ -39,12 +51,13 @@ export const useStore = create<AppState>()(
       outfits: [],
       currentCanvasItems: [],
       wearRecords: [],
+      tags: [],
 
       addClothingItem: (item) => {
         set((state) => ({
           clothingItems: [
             ...state.clothingItems,
-            { ...item, id: generateId(), createdAt: Date.now() },
+            { ...item, tagIds: item.tagIds || [], id: generateId(), createdAt: Date.now() },
           ],
         }));
       },
@@ -59,6 +72,14 @@ export const useStore = create<AppState>()(
             ...record,
             clothingIds: record.clothingIds.filter((cid) => cid !== id),
           })).filter((record) => record.clothingIds.length > 0),
+        }));
+      },
+
+      updateClothingItem: (id, updates) => {
+        set((state) => ({
+          clothingItems: state.clothingItems.map((item) =>
+            item.id === id ? { ...item, ...updates } : item
+          ),
         }));
       },
 
@@ -272,6 +293,73 @@ export const useStore = create<AppState>()(
 
         return stats;
       },
+
+      addTag: (tag) => {
+        set((state) => ({
+          tags: [...state.tags, { ...tag, id: generateId(), createdAt: Date.now() }],
+        }));
+      },
+
+      updateTag: (id, updates) => {
+        set((state) => ({
+          tags: state.tags.map((tag) =>
+            tag.id === id ? { ...tag, ...updates } : tag
+          ),
+        }));
+      },
+
+      removeTag: (id) => {
+        set((state) => ({
+          tags: state.tags.filter((tag) => tag.id !== id),
+          clothingItems: state.clothingItems.map((item) => ({
+            ...item,
+            tagIds: item.tagIds.filter((tid) => tid !== id),
+          })),
+        }));
+      },
+
+      initializeDefaultTags: () => {
+        const { tags } = get();
+        if (tags.length > 0) return;
+        
+        DEFAULT_TAGS.forEach((tag) => {
+          get().addTag(tag);
+        });
+      },
+
+      addTagToClothing: (clothingId, tagId) => {
+        set((state) => ({
+          clothingItems: state.clothingItems.map((item) =>
+            item.id === clothingId && !item.tagIds.includes(tagId)
+              ? { ...item, tagIds: [...item.tagIds, tagId] }
+              : item
+          ),
+        }));
+      },
+
+      removeTagFromClothing: (clothingId, tagId) => {
+        set((state) => ({
+          clothingItems: state.clothingItems.map((item) =>
+            item.id === clothingId
+              ? { ...item, tagIds: item.tagIds.filter((tid) => tid !== tagId) }
+              : item
+          ),
+        }));
+      },
+
+      getClothingTags: (clothingId) => {
+        const { clothingItems, tags } = get();
+        const item = clothingItems.find((i) => i.id === clothingId);
+        if (!item) return [];
+        return tags.filter((tag) => item.tagIds.includes(tag.id));
+      },
+
+      getRecommendedTags: (category, color) => {
+        const { tags } = get();
+        const key = `${category}-${color}`;
+        const recommendedNames = TAG_RECOMMENDATIONS[key] || [];
+        return tags.filter((tag) => recommendedNames.includes(tag.name));
+      },
     }),
     {
       name: 'wardrobe-storage',
@@ -279,6 +367,7 @@ export const useStore = create<AppState>()(
         clothingItems: state.clothingItems,
         outfits: state.outfits,
         wearRecords: state.wearRecords,
+        tags: state.tags,
       }),
     }
   )

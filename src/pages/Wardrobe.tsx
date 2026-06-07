@@ -1,10 +1,13 @@
-import { useState } from 'react';
-import { Plus, Shirt } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Shirt, Tag as TagIcon, Settings, X } from 'lucide-react';
 import { useStore } from '@/store/useStore';
-import { ClothingCategory, CATEGORY_LABELS } from '@/types';
+import { ClothingCategory, CATEGORY_LABELS, TAG_COLORS, ClothingItem } from '@/types';
 import ClothingCard from '@/components/ClothingCard';
 import CategoryTag from '@/components/CategoryTag';
 import UploadModal from '@/components/UploadModal';
+import TagManagerModal from '@/components/TagManagerModal';
+import ClothingTagModal from '@/components/ClothingTagModal';
+import { cn } from '@/lib/utils';
 
 const categories: (ClothingCategory | 'all')[] = [
   'all',
@@ -18,13 +21,41 @@ const categories: (ClothingCategory | 'all')[] = [
 
 export default function Wardrobe() {
   const [activeCategory, setActiveCategory] = useState<ClothingCategory | 'all'>('all');
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const clothingItems = useStore((state) => state.clothingItems);
+  const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
+  const [tagModalItem, setTagModalItem] = useState<ClothingItem | null>(null);
 
-  const filteredItems =
-    activeCategory === 'all'
-      ? clothingItems
-      : clothingItems.filter((item) => item.category === activeCategory);
+  const clothingItems = useStore((state) => state.clothingItems);
+  const tags = useStore((state) => state.tags);
+  const initializeDefaultTags = useStore((state) => state.initializeDefaultTags);
+
+  useEffect(() => {
+    initializeDefaultTags();
+  }, [initializeDefaultTags]);
+
+  const getColorClasses = (colorValue: string) => {
+    const color = TAG_COLORS.find((c) => c.value === colorValue);
+    return color || TAG_COLORS[0];
+  };
+
+  const toggleTagFilter = (tagId: string) => {
+    setSelectedTagIds((prev) =>
+      prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
+    );
+  };
+
+  const clearTagFilters = () => {
+    setSelectedTagIds([]);
+  };
+
+  const filteredItems = clothingItems.filter((item) => {
+    const categoryMatch = activeCategory === 'all' || item.category === activeCategory;
+    const tagsMatch =
+      selectedTagIds.length === 0 ||
+      selectedTagIds.every((tagId) => item.tagIds.includes(tagId));
+    return categoryMatch && tagsMatch;
+  });
 
   return (
     <div className="min-h-screen pb-20 md:pb-8">
@@ -45,6 +76,63 @@ export default function Wardrobe() {
           </button>
         </div>
 
+        <div className="bg-white rounded-2xl p-5 mb-6 shadow-soft">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <h3 className="text-sm font-medium text-earth-700 flex items-center gap-2">
+              <TagIcon className="w-4 h-4" />
+              标签筛选
+              {selectedTagIds.length > 0 && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-sage-100 text-sage-700">
+                  已选 {selectedTagIds.length} 个
+                </span>
+              )}
+            </h3>
+            <div className="flex items-center gap-2">
+              {selectedTagIds.length > 0 && (
+                <button
+                  onClick={clearTagFilters}
+                  className="text-xs text-earth-500 hover:text-earth-700 flex items-center gap-1"
+                >
+                  <X className="w-3 h-3" />
+                  清除筛选
+                </button>
+              )}
+              <button
+                onClick={() => setIsTagManagerOpen(true)}
+                className="text-xs text-sage-600 hover:text-sage-700 flex items-center gap-1"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                管理标签
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {tags.length === 0 ? (
+              <p className="text-sm text-earth-400">还没有标签，点击"管理标签"创建</p>
+            ) : (
+              tags.map((tag) => {
+                const colorClasses = getColorClasses(tag.color);
+                const isSelected = selectedTagIds.includes(tag.id);
+                return (
+                  <button
+                    key={tag.id}
+                    onClick={() => toggleTagFilter(tag.id)}
+                    className={cn(
+                      'px-3 py-1 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-1.5',
+                      isSelected
+                        ? `${colorClasses.bg} ${colorClasses.text} ring-2 ring-offset-1 ${colorClasses.border.replace('border-', 'ring-')}`
+                        : 'bg-earth-100 text-earth-500 hover:bg-earth-200'
+                    )}
+                  >
+                    {tag.name}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
         <div className="flex flex-wrap gap-2 mb-6">
           {categories.map((cat) => (
             <CategoryTag
@@ -63,31 +151,49 @@ export default function Wardrobe() {
               <Shirt className="w-10 h-10 text-earth-400" />
             </div>
             <h3 className="text-lg font-medium text-earth-700 mb-2">
-              {activeCategory === 'all' ? '衣橱还是空的' : '这个分类还没有衣物'}
+              {selectedTagIds.length > 0
+                ? '没有符合条件的衣物'
+                : activeCategory === 'all'
+                ? '衣橱还是空的'
+                : '这个分类还没有衣物'}
             </h3>
             <p className="text-earth-500 mb-6">
-              {activeCategory === 'all'
+              {selectedTagIds.length > 0
+                ? '试试调整标签筛选条件'
+                : activeCategory === 'all'
                 ? '点击上方按钮，开始记录你的第一件旧衣吧'
                 : '添加衣物时选择对应分类'}
             </p>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="btn-primary inline-flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              添加第一件衣物
-            </button>
+            {selectedTagIds.length === 0 && (
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="btn-primary inline-flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                添加第一件衣物
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {filteredItems.map((item) => (
-              <ClothingCard key={item.id} item={item} />
+              <ClothingCard
+                key={item.id}
+                item={item}
+                onTagClick={() => setTagModalItem(item)}
+              />
             ))}
           </div>
         )}
       </div>
 
       <UploadModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <TagManagerModal isOpen={isTagManagerOpen} onClose={() => setIsTagManagerOpen(false)} />
+      <ClothingTagModal
+        isOpen={!!tagModalItem}
+        onClose={() => setTagModalItem(null)}
+        clothingItem={tagModalItem}
+      />
     </div>
   );
 }

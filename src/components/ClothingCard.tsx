@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Trash2, GripVertical } from 'lucide-react';
-import { ClothingItem, CATEGORY_LABELS } from '@/types';
+import { Trash2, GripVertical, Tag as TagIcon } from 'lucide-react';
+import { ClothingItem, CATEGORY_LABELS, TAG_COLORS } from '@/types';
 import { useStore } from '@/store/useStore';
 import { cn } from '@/lib/utils';
 
@@ -10,6 +10,7 @@ interface ClothingCardProps {
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent, item: ClothingItem) => void;
   onClick?: () => void;
+  onTagClick?: () => void;
   className?: string;
 }
 
@@ -19,16 +20,30 @@ export default function ClothingCard({
   draggable = false,
   onDragStart,
   onClick,
+  onTagClick,
   className,
 }: ClothingCardProps) {
   const [imageError, setImageError] = useState(false);
   const removeClothingItem = useStore((state) => state.removeClothingItem);
+  const getClothingTags = useStore((state) => state.getClothingTags);
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm('确定要删除这件衣物吗？')) {
       removeClothingItem(item.id);
     }
+  };
+
+  const tags = getClothingTags(item.id);
+
+  const getColorClasses = (colorValue: string) => {
+    const color = TAG_COLORS.find((c) => c.value === colorValue);
+    return color || TAG_COLORS[0];
+  };
+
+  const handleTagClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onTagClick?.();
   };
 
   return (
@@ -71,6 +86,16 @@ export default function ClothingCard({
             <GripVertical className="w-3 h-3" />
           </div>
         )}
+
+        {onTagClick && (
+          <button
+            onClick={handleTagClick}
+            className="absolute bottom-2 right-2 p-1.5 rounded-full bg-white/80 backdrop-blur-sm text-earth-500 hover:text-sage-600 hover:bg-white opacity-0 group-hover:opacity-100 transition-all duration-200"
+            title="编辑标签"
+          >
+            <TagIcon className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       <div className="p-3">
@@ -81,6 +106,33 @@ export default function ClothingCard({
           </span>
           <span className="text-xs text-earth-500">{item.color}</span>
         </div>
+        {tags.length > 0 && (
+          <div
+            className="flex flex-wrap gap-1 mt-2 cursor-pointer"
+            onClick={handleTagClick}
+          >
+            {tags.slice(0, 3).map((tag) => {
+              const colorClasses = getColorClasses(tag.color);
+              return (
+                <span
+                  key={tag.id}
+                  className={cn(
+                    'text-xs px-1.5 py-0.5 rounded-full',
+                    colorClasses.bg,
+                    colorClasses.text
+                  )}
+                >
+                  {tag.name}
+                </span>
+              );
+            })}
+            {tags.length > 3 && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-earth-100 text-earth-500">
+                +{tags.length - 3}
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
