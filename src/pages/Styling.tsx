@@ -1,10 +1,11 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { Trash2, Save, Shuffle, X, Palette as PaletteIcon } from 'lucide-react';
+import { Trash2, Save, Shuffle, X, Palette as PaletteIcon, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 import { ClothingItem, ClothingCategory, CATEGORY_LABELS } from '@/types';
 import ClothingCard from '@/components/ClothingCard';
 import CategoryTag from '@/components/CategoryTag';
 import ColorRecommendation from '@/components/ColorRecommendation';
+import LayerPanel from '@/components/LayerPanel';
 import { getColorRecommendations, ColorMatchResult } from '@/utils/colorMatching';
 
 const categories: ClothingCategory[] = [
@@ -16,12 +17,24 @@ const categories: ClothingCategory[] = [
   'accessory',
 ];
 
+interface AlignmentGuide {
+  type: 'vertical' | 'horizontal';
+  position: number;
+  color: string;
+}
+
+const SNAP_THRESHOLD = 8;
+const GUIDE_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'];
+
 export default function Styling() {
   const [activeCategory, setActiveCategory] = useState<ClothingCategory>('top');
   const [draggedItem, setDraggedItem] = useState<ClothingItem | null>(null);
   const [savedOutfitName, setSavedOutfitName] = useState('');
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [baseItem, setBaseItem] = useState<ClothingItem | null>(null);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [alignmentGuides, setAlignmentGuides] = useState<AlignmentGuide[]>([]);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const clothingItems = useStore((state) => state.clothingItems);
@@ -31,6 +44,10 @@ export default function Styling() {
   const removeFromCanvas = useStore((state) => state.removeFromCanvas);
   const clearCanvas = useStore((state) => state.clearCanvas);
   const addOutfit = useStore((state) => state.addOutfit);
+  const bringToFront = useStore((state) => state.bringToFront);
+  const sendToBack = useStore((state) => state.sendToBack);
+  const bringForward = useStore((state) => state.bringForward);
+  const sendBackward = useStore((state) => state.sendBackward);
 
   const canvasItemIds = useMemo(
     () => currentCanvasItems.map((c) => c.clothingId),
@@ -41,6 +58,15 @@ export default function Styling() {
     if (!baseItem) return [];
     return getColorRecommendations(baseItem, clothingItems, canvasItemIds);
   }, [baseItem, clothingItems, canvasItemIds]);
+
+  const gridSize = useMemo(() => {
+    const baseSize = 40;
+    if (zoom >= 2) return baseSize / 2;
+    if (zoom >= 1.5) return baseSize;
+    if (zoom >= 1) return baseSize;
+    if (zoom >= 0.75) return baseSize * 1.5;
+    return baseSize * 2;
+  }, [zoom]);
 
   useEffect(() => {
     if (baseItem) {
@@ -79,7 +105,8 @@ export default function Styling() {
       ...canvasItem,
       item: clothingItems.find((c) => c.id === canvasItem.clothingId),
     }))
-    .filter((c) => c.item);
+    .filter((c) => c.item)
+    .sort((a, b) => a.zIndex - b.zIndex);
 
   const handleDragStart = (e: React.DragEvent, item: ClothingItem) => {
     setDraggedItem(item);
@@ -96,8 +123,8 @@ export default function Styling() {
     if (!draggedItem || !canvasRef.current) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left - 60;
-    const y = e.clientY - rect.top - 80;
+    const x = (e.clientX - rect.left) / zoom - 60;
+    const y = (e.clientY - rect.top) / zoom - 80;
 
     addToCanvas(draggedItem.id, Math.max(0, x), Math.max(0, y));
     if (!baseItem) {
@@ -117,6 +144,75 @@ export default function Styling() {
     setBaseItem(item);
   };
 
+  const calculateAlignment = useCallback(
+    (currentItem: { x: number; y: number; width: number; height: number }, excludeId: string) => {
+      const guides: AlignmentGuide[] = [];
+      let snapX = currentItem.x;
+      let snapY = currentItem.y;
+
+      const currentCenterX = currentItem.x + currentItem.width / 2;
+      const currentCenterY = currentItem.y + currentItem.height / 2;
+      const currentRight = currentItem.x + currentItem.width;
+      const currentBottom = currentItem.y + currentItem.height;
+
+      currentCanvasItems.forEach((otherItem, index) => {
+        if (otherItem.clothingId === excludeId) return;
+
+        const otherCenterX = otherItem.x + otherItem.width / 2;
+        const otherCenterY = otherItem.y + otherItem.height / 2;
+        const otherRight = otherItem.x + otherItem.width;
+        const otherBottom = otherItem.y + otherItem.height;
+
+        const color = GUIDE_COLORS[index % GUIDE_COLORS.length];
+
+        if (Math.abs(currentItem.x - otherItem.x) < SNAP_THRESHOLD) {
+          snapX = otherItem.x;
+          guides.push({ type: 'vertical', position: otherItem.x, color });
+        }
+        if (Math.abs(currentItem.x - otherRight) < SNAP_THRESHOLD) {
+          snapX = otherRight;
+          guides.push({ type: 'vertical', position: otherRight, color });
+        }
+        if (Math.abs(currentRight - otherItem.x) < SNAP_THRESHOLD) {
+          snapX = otherItem.x - currentItem.width;
+          guides.push({ type: 'vertical', position: otherItem.x, color });
+        }
+        if (Math.abs(currentRight - otherRight) < SNAP_THRESHOLD) {
+          snapX = otherRight - currentItem.width;
+          guides.push({ type: 'vertical', position: otherRight, color });
+        }
+        if (Math.abs(currentCenterX - otherCenterX) < SNAP_THRESHOLD) {
+          snapX = otherCenterX - currentItem.width / 2;
+          guides.push({ type: 'vertical', position: otherCenterX, color });
+        }
+
+        if (Math.abs(currentItem.y - otherItem.y) < SNAP_THRESHOLD) {
+          snapY = otherItem.y;
+          guides.push({ type: 'horizontal', position: otherItem.y, color });
+        }
+        if (Math.abs(currentItem.y - otherBottom) < SNAP_THRESHOLD) {
+          snapY = otherBottom;
+          guides.push({ type: 'horizontal', position: otherBottom, color });
+        }
+        if (Math.abs(currentBottom - otherItem.y) < SNAP_THRESHOLD) {
+          snapY = otherItem.y - currentItem.height;
+          guides.push({ type: 'horizontal', position: otherItem.y, color });
+        }
+        if (Math.abs(currentBottom - otherBottom) < SNAP_THRESHOLD) {
+          snapY = otherBottom - currentItem.height;
+          guides.push({ type: 'horizontal', position: otherBottom, color });
+        }
+        if (Math.abs(currentCenterY - otherCenterY) < SNAP_THRESHOLD) {
+          snapY = otherCenterY - currentItem.height / 2;
+          guides.push({ type: 'horizontal', position: otherCenterY, color });
+        }
+      });
+
+      return { guides, snapX, snapY };
+    },
+    [currentCanvasItems]
+  );
+
   const handleCanvasItemDrag = useCallback(
     (e: React.MouseEvent, clothingId: string) => {
       if (!canvasRef.current) return;
@@ -127,20 +223,37 @@ export default function Styling() {
       const item = currentCanvasItems.find((c) => c.clothingId === clothingId);
       if (!item) return;
 
+      setSelectedItemId(clothingId);
+
       const startItemX = item.x;
       const startItemY = item.y;
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
-        const deltaX = moveEvent.clientX - startX;
-        const deltaY = moveEvent.clientY - startY;
+        const deltaX = (moveEvent.clientX - startX) / zoom;
+        const deltaY = (moveEvent.clientY - startY) / zoom;
+
+        let newX = Math.max(0, Math.min(startItemX + deltaX, rect.width / zoom - item.width));
+        let newY = Math.max(0, Math.min(startItemY + deltaY, rect.height / zoom - item.height));
+
+        const { guides, snapX, snapY } = calculateAlignment(
+          { x: newX, y: newY, width: item.width, height: item.height },
+          clothingId
+        );
+
+        if (guides.length > 0) {
+          newX = snapX;
+          newY = snapY;
+        }
+
+        setAlignmentGuides(guides);
 
         updateCanvasItems(
           currentCanvasItems.map((c) =>
             c.clothingId === clothingId
               ? {
                   ...c,
-                  x: Math.max(0, Math.min(startItemX + deltaX, rect.width - c.width)),
-                  y: Math.max(0, Math.min(startItemY + deltaY, rect.height - c.height)),
+                  x: newX,
+                  y: newY,
                 }
               : c
           )
@@ -150,13 +263,30 @@ export default function Styling() {
       const handleMouseUp = () => {
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
+        setAlignmentGuides([]);
       };
 
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
     },
-    [currentCanvasItems, updateCanvasItems]
+    [currentCanvasItems, updateCanvasItems, zoom, calculateAlignment]
   );
+
+  const handleCanvasClick = () => {
+    setSelectedItemId(null);
+  };
+
+  const handleZoomIn = () => {
+    setZoom((prev) => Math.min(prev + 0.25, 3));
+  };
+
+  const handleZoomOut = () => {
+    setZoom((prev) => Math.max(prev - 0.25, 0.5));
+  };
+
+  const handleResetZoom = () => {
+    setZoom(1);
+  };
 
   const handleSave = () => {
     if (!savedOutfitName.trim()) {
@@ -233,7 +363,7 @@ export default function Styling() {
                 ))}
               </div>
 
-              <div className="space-y-3 max-h-[340px] overflow-y-auto scrollbar-hide pr-1">
+              <div className="space-y-3 max-h-[280px] overflow-y-auto scrollbar-hide pr-1">
                 {filteredItems.length === 0 ? (
                   <div className="text-center py-8 text-earth-400 text-sm">
                     <PaletteIcon className="w-10 h-10 mx-auto mb-2 opacity-50" />
@@ -259,6 +389,17 @@ export default function Styling() {
               </div>
             </div>
 
+            <LayerPanel
+              canvasItems={currentCanvasItems}
+              clothingItems={clothingItems}
+              selectedItemId={selectedItemId}
+              onSelectItem={setSelectedItemId}
+              onBringToFront={bringToFront}
+              onSendToBack={sendToBack}
+              onBringForward={bringForward}
+              onSendBackward={sendBackward}
+            />
+
             <ColorRecommendation
               baseItem={baseItem}
               recommendations={recommendations}
@@ -267,50 +408,135 @@ export default function Styling() {
           </div>
 
           <div className="lg:col-span-9 order-1 lg:order-2">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm text-earth-500">
+                缩放: {Math.round(zoom * 100)}%
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleZoomOut}
+                  className="p-2 rounded-lg bg-white shadow-soft hover:bg-earth-50 transition-colors disabled:opacity-50"
+                  disabled={zoom <= 0.5}
+                  title="缩小"
+                >
+                  <ZoomOut className="w-4 h-4 text-earth-600" />
+                </button>
+                <button
+                  onClick={handleResetZoom}
+                  className="p-2 rounded-lg bg-white shadow-soft hover:bg-earth-50 transition-colors"
+                  title="重置缩放"
+                >
+                  <RotateCcw className="w-4 h-4 text-earth-600" />
+                </button>
+                <button
+                  onClick={handleZoomIn}
+                  className="p-2 rounded-lg bg-white shadow-soft hover:bg-earth-50 transition-colors disabled:opacity-50"
+                  disabled={zoom >= 3}
+                  title="放大"
+                >
+                  <ZoomIn className="w-4 h-4 text-earth-600" />
+                </button>
+              </div>
+            </div>
+
             <div
               ref={canvasRef}
-              className="bg-white rounded-2xl shadow-soft dashed-grid min-h-[500px] lg:min-h-[600px] relative overflow-hidden"
+              className="bg-white rounded-2xl shadow-soft min-h-[500px] lg:min-h-[600px] relative overflow-hidden"
+              style={{
+                backgroundImage: `
+                  linear-gradient(to right, rgba(91, 140, 90, 0.15) 1px, transparent 1px),
+                  linear-gradient(to bottom, rgba(91, 140, 90, 0.15) 1px, transparent 1px)
+                `,
+                backgroundSize: `${gridSize}px ${gridSize}px`,
+              }}
               onDragOver={handleDragOver}
               onDrop={handleDrop}
+              onClick={handleCanvasClick}
             >
-              {canvasClothingItems.length === 0 ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-earth-400">
-                  <div className="w-16 h-16 rounded-full bg-earth-100 flex items-center justify-center mb-3">
-                    <PaletteIcon className="w-8 h-8" />
+              <div
+                className="w-full h-full relative"
+                style={{
+                  transform: `scale(${zoom})`,
+                  transformOrigin: 'top left',
+                }}
+              >
+                {canvasClothingItems.length === 0 ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-earth-400" style={{ transform: `scale(${1 / zoom})`, transformOrigin: 'center' }}>
+                    <div className="w-16 h-16 rounded-full bg-earth-100 flex items-center justify-center mb-3">
+                      <PaletteIcon className="w-8 h-8" />
+                    </div>
+                    <p className="font-medium">从左侧拖拽衣物到这里</p>
+                    <p className="text-sm mt-1">画布上的衣物可以自由拖动调整位置</p>
                   </div>
-                  <p className="font-medium">从左侧拖拽衣物到这里</p>
-                  <p className="text-sm mt-1">画布上的衣物可以自由拖动调整位置</p>
-                </div>
-              ) : (
-                canvasClothingItems.map(({ item, x, y, width, height }) => (
-                  item && (
-                    <div
-                      key={item.id}
-                      className="absolute cursor-move group"
-                      style={{ left: x, top: y, width, height }}
-                      onMouseDown={(e) => handleCanvasItemDrag(e, item.id)}
-                    >
-                      <div className="w-full h-full rounded-xl overflow-hidden shadow-soft-hover border-2 border-white bg-white">
-                        <img
-                          src={item.imageUrl}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                          draggable={false}
-                        />
-                      </div>
-                      <button
+                ) : (
+                  canvasClothingItems.map(({ item, x, y, width, height, zIndex }) => (
+                    item && (
+                      <div
+                        key={item.id}
+                        className={`absolute cursor-move group transition-all duration-100 ${
+                          selectedItemId === item.id ? 'ring-2 ring-sage-400 ring-offset-2 rounded-xl' : ''
+                        }`}
+                        style={{ left: x, top: y, width, height, zIndex }}
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          handleCanvasItemDrag(e, item.id);
+                        }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          removeFromCanvas(item.id);
+                          setSelectedItemId(item.id);
                         }}
-                        className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
                       >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  )
-                ))
-              )}
+                        <div className="w-full h-full rounded-xl overflow-hidden shadow-soft-hover border-2 border-white bg-white">
+                          <img
+                            src={item.imageUrl}
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                            draggable={false}
+                          />
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeFromCanvas(item.id);
+                            if (selectedItemId === item.id) {
+                              setSelectedItemId(null);
+                            }
+                          }}
+                          className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )
+                  ))
+                )}
+
+                {alignmentGuides.map((guide, index) => (
+                  <div
+                    key={index}
+                    className="absolute pointer-events-none"
+                    style={{
+                      ...(guide.type === 'vertical'
+                        ? {
+                            left: guide.position,
+                            top: 0,
+                            width: '2px',
+                            height: '100%',
+                            backgroundColor: guide.color,
+                          }
+                        : {
+                            left: 0,
+                            top: guide.position,
+                            width: '100%',
+                            height: '2px',
+                            backgroundColor: guide.color,
+                          }),
+                      zIndex: 9999,
+                      opacity: 0.8,
+                    }}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         </div>

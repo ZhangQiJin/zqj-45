@@ -87,6 +87,7 @@ export interface CanvasItem {
   y: number;
   width: number;
   height: number;
+  zIndex: number;
 }
 
 export const CATEGORY_LABELS: Record<ClothingCategory, string> = {
