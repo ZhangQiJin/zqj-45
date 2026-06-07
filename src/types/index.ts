@@ -79,6 +79,7 @@ export interface Outfit {
   items: string[];
   scene?: SceneType;
   createdAt: number;
+  canvasItems?: OutfitCanvasItem[];
 }
 
 export interface CanvasItem {
@@ -88,6 +89,25 @@ export interface CanvasItem {
   width: number;
   height: number;
   zIndex: number;
+}
+
+export interface OutfitCanvasItem {
+  clothingId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  zIndex: number;
+}
+
+export const EXPORT_DATA_VERSION = 1;
+
+export interface ExportData {
+  version: number;
+  exportedAt: number;
+  outfits: Outfit[];
+  clothingItems: ClothingItem[];
+  tags: Tag[];
 }
 
 export const CATEGORY_LABELS: Record<ClothingCategory, string> = {

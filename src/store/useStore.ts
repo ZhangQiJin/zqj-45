@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ClothingItem, Outfit, CanvasItem, SceneType, ClothingCategory, WearRecord, ClothingWearStats, Tag, DEFAULT_TAGS, TAG_RECOMMENDATIONS, UserTransform, TransformCategory, TransformExecution } from '@/types';
+import { ClothingItem, Outfit, CanvasItem, SceneType, ClothingCategory, WearRecord, ClothingWearStats, Tag, DEFAULT_TAGS, TAG_RECOMMENDATIONS, UserTransform, TransformCategory, TransformExecution, OutfitCanvasItem } from '@/types';
 import { generateId } from '@/utils/image';
 import { sceneRecommendations } from '@/data/scenes';
 
@@ -19,7 +19,7 @@ interface AppState {
   removeClothingItem: (id: string) => void;
   updateClothingItem: (id: string, updates: Partial<Omit<ClothingItem, 'id' | 'createdAt'>>) => void;
   
-  addOutfit: (outfit: Omit<Outfit, 'id' | 'createdAt'>) => void;
+  addOutfit: (outfit: Omit<Outfit, 'id' | 'createdAt'>, canvasItems?: OutfitCanvasItem[]) => void;
   removeOutfit: (id: string) => void;
   
   updateCanvasItems: (items: CanvasItem[]) => void;
@@ -117,11 +117,11 @@ export const useStore = create<AppState>()(
         }));
       },
 
-      addOutfit: (outfit) => {
+      addOutfit: (outfit, canvasItems) => {
         set((state) => ({
           outfits: [
             ...state.outfits,
-            { ...outfit, id: generateId(), createdAt: Date.now() },
+            { ...outfit, id: generateId(), createdAt: Date.now(), canvasItems },
           ],
         }));
       },

@@ -1,12 +1,14 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { Trash2, Save, Shuffle, X, Palette as PaletteIcon, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { Trash2, Save, Shuffle, X, Palette as PaletteIcon, ZoomIn, ZoomOut, RotateCcw, Download, Upload, AlertTriangle } from 'lucide-react';
 import { useStore } from '@/store/useStore';
-import { ClothingItem, ClothingCategory, CATEGORY_LABELS } from '@/types';
+import { ClothingItem, ClothingCategory, CATEGORY_LABELS, ExportData } from '@/types';
 import ClothingCard from '@/components/ClothingCard';
 import CategoryTag from '@/components/CategoryTag';
 import ColorRecommendation from '@/components/ColorRecommendation';
 import LayerPanel from '@/components/LayerPanel';
+import ImportPreviewModal from '@/components/ImportPreviewModal';
 import { getColorRecommendations, ColorMatchResult } from '@/utils/colorMatching';
+import { exportOutfits, parseImportFile, processImportData, ImportResult, ValidationResult } from '@/utils/outfitImportExport';
 
 const categories: ClothingCategory[] = [
   'top',
@@ -35,15 +37,25 @@ export default function Styling() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [alignmentGuides, setAlignmentGuides] = useState<AlignmentGuide[]>([]);
+  const [showImportPreview, setShowImportPreview] = useState(false);
+  const [importData, setImportData] = useState<ExportData | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [importFileName, setImportFileName] = useState('');
+  const [importError, setImportError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const clothingItems = useStore((state) => state.clothingItems);
+  const outfits = useStore((state) => state.outfits);
+  const tags = useStore((state) => state.tags);
   const currentCanvasItems = useStore((state) => state.currentCanvasItems);
   const addToCanvas = useStore((state) => state.addToCanvas);
   const updateCanvasItems = useStore((state) => state.updateCanvasItems);
   const removeFromCanvas = useStore((state) => state.removeFromCanvas);
   const clearCanvas = useStore((state) => state.clearCanvas);
   const addOutfit = useStore((state) => state.addOutfit);
+  const addClothingItem = useStore((state) => state.addClothingItem);
+  const addTag = useStore((state) => state.addTag);
   const bringToFront = useStore((state) => state.bringToFront);
   const sendToBack = useStore((state) => state.sendToBack);
   const bringForward = useStore((state) => state.bringForward);
@@ -293,10 +305,20 @@ export default function Styling() {
       alert('请输入搭配名称');
       return;
     }
-    addOutfit({
-      name: savedOutfitName.trim(),
-      items: currentCanvasItems.map((c) => c.clothingId),
-    });
+    addOutfit(
+      {
+        name: savedOutfitName.trim(),
+        items: currentCanvasItems.map((c) => c.clothingId),
+      },
+      currentCanvasItems.map((c) => ({
+        clothingId: c.clothingId,
+        x: c.x,
+        y: c.y,
+        width: c.width,
+        height: c.height,
+        zIndex: c.zIndex,
+      }))
+    );
     setSavedOutfitName('');
     setShowSaveModal(false);
     alert('搭配保存成功！');
@@ -313,6 +335,91 @@ export default function Styling() {
     selected.forEach((item, index) => {
       addToCanvas(item.id, 50 + (index % 2) * 150, 50 + Math.floor(index / 2) * 200);
     });
+  };
+
+  const handleExport = () => {
+    if (outfits.length === 0) {
+      alert('还没有保存的搭配方案，先保存一些搭配吧～');
+      return;
+    }
+    const outfitIds = new Set(outfits.flatMap((o) => o.items));
+    const relatedClothingItems = clothingItems.filter((c) => outfitIds.has(c.id));
+    const tagIds = new Set(relatedClothingItems.flatMap((c) => c.tagIds || []));
+    const relatedTags = tags.filter((t) => tagIds.has(t.id));
+    exportOutfits(outfits, relatedClothingItems, relatedTags);
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportError(null);
+
+    const result: ValidationResult = await parseImportFile(file);
+
+    if (!result.valid || !result.data) {
+      setImportError(result.error || '导入失败');
+      e.target.value = '';
+      return;
+    }
+
+    const existingClothingIds = new Set(clothingItems.map((c) => c.id));
+    const existingTagNames = new Set(tags.map((t) => t.name));
+    const processed = processImportData(result.data, existingClothingIds, existingTagNames);
+
+    setImportData(result.data);
+    setImportResult(processed);
+    setImportFileName(file.name);
+    setShowImportPreview(true);
+    e.target.value = '';
+  };
+
+  const handleConfirmImport = () => {
+    if (!importResult) return;
+
+    importResult.tags.forEach((tag) => {
+      addTag({ name: tag.name, color: tag.color });
+    });
+
+    importResult.clothingItems.forEach((item) => {
+      addClothingItem({
+        name: item.name,
+        category: item.category as ClothingCategory,
+        color: item.color,
+        imageUrl: item.imageUrl,
+        tagIds: item.tagIds,
+      });
+    });
+
+    setTimeout(() => {
+      importResult.outfits.forEach((outfit) => {
+        useStore.getState().addOutfit(
+          {
+            name: outfit.name,
+            items: outfit.items,
+            scene: outfit.scene,
+          },
+          outfit.canvasItems
+        );
+      });
+
+      setShowImportPreview(false);
+      setImportData(null);
+      setImportResult(null);
+      setImportFileName('');
+      alert('导入成功！');
+    }, 100);
+  };
+
+  const handleCancelImport = () => {
+    setShowImportPreview(false);
+    setImportData(null);
+    setImportResult(null);
+    setImportFileName('');
   };
 
   return (
@@ -344,6 +451,29 @@ export default function Styling() {
               <Save className="w-4 h-4" />
               保存搭配
             </button>
+            <div className="w-px h-8 bg-earth-200 mx-1 self-center" />
+            <button
+              onClick={handleExport}
+              className="btn-secondary flex items-center gap-2 disabled:opacity-50"
+              disabled={outfits.length === 0}
+            >
+              <Download className="w-4 h-4" />
+              导出
+            </button>
+            <button
+              onClick={handleImportClick}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <Upload className="w-4 h-4" />
+              导入
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleFileChange}
+              className="hidden"
+            />
           </div>
         </div>
 
@@ -566,6 +696,38 @@ export default function Styling() {
             </div>
           </div>
         </div>
+      )}
+
+      {importError && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-earth-900/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-soft-hover w-full max-w-sm overflow-hidden animate-slide-up p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-serif font-semibold text-earth-800">导入失败</h3>
+              </div>
+            </div>
+            <p className="text-earth-600 mb-6">{importError}</p>
+            <button
+              onClick={() => setImportError(null)}
+              className="w-full btn-primary"
+            >
+              知道了
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showImportPreview && importData && importResult && (
+        <ImportPreviewModal
+          data={importData}
+          importResult={importResult}
+          fileName={importFileName}
+          onConfirm={handleConfirmImport}
+          onCancel={handleCancelImport}
+        />
       )}
     </div>
   );
