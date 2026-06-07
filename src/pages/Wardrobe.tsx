@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Shirt, Tag as TagIcon, Settings, X } from 'lucide-react';
+import { Plus, Shirt, Tag as TagIcon, Settings, X, Search } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 import { ClothingCategory, CATEGORY_LABELS, TAG_COLORS, ClothingItem } from '@/types';
 import ClothingCard from '@/components/ClothingCard';
@@ -22,6 +22,7 @@ const categories: (ClothingCategory | 'all')[] = [
 export default function Wardrobe() {
   const [activeCategory, setActiveCategory] = useState<ClothingCategory | 'all'>('all');
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [searchKeyword, setSearchKeyword] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
   const [tagModalItem, setTagModalItem] = useState<ClothingItem | null>(null);
@@ -55,7 +56,10 @@ export default function Wardrobe() {
     const tagsMatch =
       selectedTagIds.length === 0 ||
       selectedTagIds.every((tagId) => itemTagIds.includes(tagId));
-    return categoryMatch && tagsMatch;
+    const searchMatch =
+      searchKeyword.trim() === '' ||
+      item.name.toLowerCase().includes(searchKeyword.trim().toLowerCase());
+    return categoryMatch && tagsMatch && searchMatch;
   });
 
   return (
@@ -78,6 +82,27 @@ export default function Wardrobe() {
         </div>
 
         <div className="bg-white rounded-2xl p-5 mb-6 shadow-soft">
+          <div className="mb-5">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-earth-400" />
+              <input
+                type="text"
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                placeholder="搜索衣物名称..."
+                className="w-full pl-12 pr-12 py-3 rounded-xl bg-earth-50 border border-earth-200 text-earth-700 placeholder-earth-400 focus:outline-none focus:ring-2 focus:ring-sage-300 focus:border-transparent transition-all"
+              />
+              {searchKeyword && (
+                <button
+                  onClick={() => setSearchKeyword('')}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-earth-200 hover:bg-earth-300 flex items-center justify-center transition-colors"
+                >
+                  <X className="w-4 h-4 text-earth-500" />
+                </button>
+              )}
+            </div>
+          </div>
+
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
             <h3 className="text-sm font-medium text-earth-700 flex items-center gap-2">
               <TagIcon className="w-4 h-4" />
@@ -152,26 +177,39 @@ export default function Wardrobe() {
               <Shirt className="w-10 h-10 text-earth-400" />
             </div>
             <h3 className="text-lg font-medium text-earth-700 mb-2">
-              {selectedTagIds.length > 0
+              {searchKeyword.trim() !== ''
+                ? '没有找到匹配的衣物'
+                : selectedTagIds.length > 0
                 ? '没有符合条件的衣物'
                 : activeCategory === 'all'
                 ? '衣橱还是空的'
                 : '这个分类还没有衣物'}
             </h3>
             <p className="text-earth-500 mb-6">
-              {selectedTagIds.length > 0
+              {searchKeyword.trim() !== ''
+                ? '试试换个关键词，或清除搜索条件重新筛选'
+                : selectedTagIds.length > 0
                 ? '试试调整标签筛选条件'
                 : activeCategory === 'all'
                 ? '点击上方按钮，开始记录你的第一件旧衣吧'
                 : '添加衣物时选择对应分类'}
             </p>
-            {selectedTagIds.length === 0 && (
+            {searchKeyword.trim() === '' && selectedTagIds.length === 0 && (
               <button
                 onClick={() => setIsModalOpen(true)}
                 className="btn-primary inline-flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
                 添加第一件衣物
+              </button>
+            )}
+            {searchKeyword.trim() !== '' && (
+              <button
+                onClick={() => setSearchKeyword('')}
+                className="btn-primary inline-flex items-center gap-2"
+              >
+                <X className="w-4 h-4" />
+                清除搜索
               </button>
             )}
           </div>
