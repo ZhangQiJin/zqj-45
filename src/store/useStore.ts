@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ClothingItem, Outfit, CanvasItem, SceneType, ClothingCategory } from '@/types';
+import { ClothingItem, Outfit, CanvasItem, SceneType, ClothingCategory, WearRecord, ClothingWearStats } from '@/types';
 import { generateId } from '@/utils/image';
 import { sceneRecommendations } from '@/data/scenes';
 
@@ -8,6 +8,7 @@ interface AppState {
   clothingItems: ClothingItem[];
   outfits: Outfit[];
   currentCanvasItems: CanvasItem[];
+  wearRecords: WearRecord[];
   
   addClothingItem: (item: Omit<ClothingItem, 'id' | 'createdAt'>) => void;
   removeClothingItem: (id: string) => void;
@@ -21,6 +22,14 @@ interface AppState {
   clearCanvas: () => void;
   
   getRandomOutfitForScene: (scene: SceneType) => ClothingItem[];
+  
+  addWearRecord: (record: Omit<WearRecord, 'id' | 'createdAt'>) => void;
+  updateWearRecord: (id: string, record: Partial<Omit<WearRecord, 'id' | 'createdAt'>>) => void;
+  removeWearRecord: (id: string) => void;
+  getWearRecordsByDate: (date: string) => WearRecord | undefined;
+  getWearRecordsByClothingId: (clothingId: string) => WearRecord[];
+  getClothingWearStats: (clothingId: string) => ClothingWearStats;
+  getAllClothingWearStats: () => Map<string, ClothingWearStats>;
 }
 
 export const useStore = create<AppState>()(
@@ -29,6 +38,7 @@ export const useStore = create<AppState>()(
       clothingItems: [],
       outfits: [],
       currentCanvasItems: [],
+      wearRecords: [],
 
       addClothingItem: (item) => {
         set((state) => ({
@@ -45,6 +55,10 @@ export const useStore = create<AppState>()(
           currentCanvasItems: state.currentCanvasItems.filter(
             (item) => item.clothingId !== id
           ),
+          wearRecords: state.wearRecords.map((record) => ({
+            ...record,
+            clothingIds: record.clothingIds.filter((cid) => cid !== id),
+          })).filter((record) => record.clothingIds.length > 0),
         }));
       },
 
@@ -175,12 +189,96 @@ export const useStore = create<AppState>()(
 
         return result;
       },
+
+      addWearRecord: (record) => {
+        set((state) => {
+          const existingIndex = state.wearRecords.findIndex((r) => r.date === record.date);
+          if (existingIndex >= 0) {
+            const updatedRecords = [...state.wearRecords];
+            updatedRecords[existingIndex] = {
+              ...updatedRecords[existingIndex],
+              clothingIds: record.clothingIds,
+              note: record.note,
+            };
+            return { wearRecords: updatedRecords };
+          }
+          return {
+            wearRecords: [
+              ...state.wearRecords,
+              { ...record, id: generateId(), createdAt: Date.now() },
+            ],
+          };
+        });
+      },
+
+      updateWearRecord: (id, record) => {
+        set((state) => ({
+          wearRecords: state.wearRecords.map((r) =>
+            r.id === id ? { ...r, ...record } : r
+          ),
+        }));
+      },
+
+      removeWearRecord: (id) => {
+        set((state) => ({
+          wearRecords: state.wearRecords.filter((r) => r.id !== id),
+        }));
+      },
+
+      getWearRecordsByDate: (date) => {
+        return get().wearRecords.find((r) => r.date === date);
+      },
+
+      getWearRecordsByClothingId: (clothingId) => {
+        return get().wearRecords.filter((r) => r.clothingIds.includes(clothingId));
+      },
+
+      getClothingWearStats: (clothingId) => {
+        const records = get().wearRecords.filter((r) => r.clothingIds.includes(clothingId));
+        const wearDates = records.map((r) => r.date).sort();
+        return {
+          clothingId,
+          totalWears: records.length,
+          lastWornDate: wearDates.length > 0 ? wearDates[wearDates.length - 1] : null,
+          wearDates,
+        };
+      },
+
+      getAllClothingWearStats: () => {
+        const stats = new Map<string, ClothingWearStats>();
+        const { clothingItems, wearRecords } = get();
+        
+        clothingItems.forEach((item) => {
+          stats.set(item.id, {
+            clothingId: item.id,
+            totalWears: 0,
+            lastWornDate: null,
+            wearDates: [],
+          });
+        });
+
+        wearRecords.forEach((record) => {
+          record.clothingIds.forEach((clothingId) => {
+            const existing = stats.get(clothingId);
+            if (existing) {
+              existing.totalWears += 1;
+              existing.wearDates.push(record.date);
+              if (!existing.lastWornDate || record.date > existing.lastWornDate) {
+                existing.lastWornDate = record.date;
+              }
+            }
+          });
+        });
+
+        return stats;
+      },
     }),
     {
       name: 'wardrobe-storage',
       partialize: (state) => ({
         clothingItems: state.clothingItems,
         outfits: state.outfits,
+        wearRecords: state.wearRecords,
       }),
     }
   )

@@ -78,3 +78,18 @@ export const COLOR_OPTIONS = [
   { value: '紫色', label: '紫色' },
   { value: '牛仔', label: '牛仔蓝' },
 ];
+
+export interface WearRecord {
+  id: string;
+  date: string;
+  clothingIds: string[];
+  note?: string;
+  createdAt: number;
+}
+
+export interface ClothingWearStats {
+  clothingId: string;
+  totalWears: number;
+  lastWornDate: string | null;
+  wearDates: string[];
+}
