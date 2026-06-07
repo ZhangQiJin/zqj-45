@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ClothingItem, Outfit, CanvasItem, SceneType } from '@/types';
+import { ClothingItem, Outfit, CanvasItem, SceneType, ClothingCategory } from '@/types';
 import { generateId } from '@/utils/image';
+import { sceneRecommendations } from '@/data/scenes';
 
 interface AppState {
   clothingItems: ClothingItem[];
@@ -101,38 +102,75 @@ export const useStore = create<AppState>()(
 
       getRandomOutfitForScene: (scene) => {
         const { clothingItems } = get();
-        const tops = clothingItems.filter((i) => i.category === 'top');
-        const bottoms = clothingItems.filter((i) => i.category === 'bottom');
-        const outerwears = clothingItems.filter((i) => i.category === 'outerwear');
-        const dresses = clothingItems.filter((i) => i.category === 'dress');
-        const shoes = clothingItems.filter((i) => i.category === 'shoes');
-        const accessories = clothingItems.filter((i) => i.category === 'accessory');
+        const sceneData = sceneRecommendations.find((s) => s.scene === scene);
+        const suggestedCategories = (sceneData?.suggestedCategories as ClothingCategory[]) || [
+          'top',
+          'bottom',
+          'shoes',
+        ];
 
         const result: ClothingItem[] = [];
+        const usedCategories = new Set<string>();
 
-        if (dresses.length > 0 && Math.random() > 0.5) {
-          result.push(dresses[Math.floor(Math.random() * dresses.length)]);
-        } else {
-          if (tops.length > 0) {
-            result.push(tops[Math.floor(Math.random() * tops.length)]);
-          }
-          if (bottoms.length > 0) {
-            result.push(bottoms[Math.floor(Math.random() * bottoms.length)]);
+        const getRandomItem = (category: ClothingCategory): ClothingItem | null => {
+          const items = clothingItems.filter(
+            (i) => i.category === category && !result.includes(i)
+          );
+          if (items.length === 0) return null;
+          return items[Math.floor(Math.random() * items.length)];
+        };
+
+        const hasDressSuggested = suggestedCategories.includes('dress');
+        const hasTopBottomSuggested =
+          suggestedCategories.includes('top') && suggestedCategories.includes('bottom');
+
+        if (hasDressSuggested && (!hasTopBottomSuggested || Math.random() > 0.4)) {
+          const dress = getRandomItem('dress');
+          if (dress) {
+            result.push(dress);
+            usedCategories.add('dress');
           }
         }
 
-        if (scene === 'travel' || scene === 'commute') {
-          if (outerwears.length > 0) {
-            result.push(outerwears[Math.floor(Math.random() * outerwears.length)]);
+        if (!usedCategories.has('dress')) {
+          if (suggestedCategories.includes('top')) {
+            const top = getRandomItem('top');
+            if (top) {
+              result.push(top);
+              usedCategories.add('top');
+            }
+          }
+          if (suggestedCategories.includes('bottom')) {
+            const bottom = getRandomItem('bottom');
+            if (bottom) {
+              result.push(bottom);
+              usedCategories.add('bottom');
+            }
           }
         }
 
-        if (shoes.length > 0) {
-          result.push(shoes[Math.floor(Math.random() * shoes.length)]);
+        if (suggestedCategories.includes('outerwear')) {
+          const outerwear = getRandomItem('outerwear');
+          if (outerwear) {
+            result.push(outerwear);
+            usedCategories.add('outerwear');
+          }
         }
 
-        if (accessories.length > 0 && Math.random() > 0.3) {
-          result.push(accessories[Math.floor(Math.random() * accessories.length)]);
+        if (suggestedCategories.includes('shoes')) {
+          const shoe = getRandomItem('shoes');
+          if (shoe) {
+            result.push(shoe);
+            usedCategories.add('shoes');
+          }
+        }
+
+        if (suggestedCategories.includes('accessory') && Math.random() > 0.2) {
+          const accessory = getRandomItem('accessory');
+          if (accessory) {
+            result.push(accessory);
+            usedCategories.add('accessory');
+          }
         }
 
         return result;

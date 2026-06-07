@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { X, Upload, Image as ImageIcon } from 'lucide-react';
 import { ClothingCategory, CATEGORY_LABELS, COLOR_OPTIONS } from '@/types';
 import { useStore } from '@/store/useStore';
@@ -17,6 +17,23 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const addClothingItem = useStore((state) => state.addClothingItem);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setName('');
+        setCategory('top');
+        setColor('白色');
+        setImageUrl('');
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   const handleFile = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) {

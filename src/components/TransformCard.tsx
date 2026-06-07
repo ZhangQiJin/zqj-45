@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Star, ChevronRight, ArrowRight, X } from 'lucide-react';
 import { TransformTemplate, TRANSFORM_CATEGORY_LABELS } from '@/types';
 import { cn } from '@/lib/utils';
@@ -10,6 +10,21 @@ interface TransformCardProps {
 export default function TransformCard({ template }: TransformCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSteps, setShowSteps] = useState(false);
+  const [beforeImageError, setBeforeImageError] = useState(false);
+  const [afterImageError, setAfterImageError] = useState(false);
+
+  useEffect(() => {
+    if (!showSteps) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowSteps(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showSteps]);
 
   const categoryColors: Record<string, string> = {
     cut: 'bg-terracotta-100 text-terracotta-700',
@@ -27,21 +42,35 @@ export default function TransformCard({ template }: TransformCardProps) {
         <div className="relative">
           <div className="grid grid-cols-2 gap-0.5 bg-earth-100">
             <div className="aspect-square bg-earth-50 relative overflow-hidden">
-              <img
-                src={template.beforeImage}
-                alt="改造前"
-                className="w-full h-full object-cover"
-              />
+              {!beforeImageError ? (
+                <img
+                  src={template.beforeImage}
+                  alt="改造前"
+                  className="w-full h-full object-cover"
+                  onError={() => setBeforeImageError(true)}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-earth-400">
+                  <span className="text-3xl">👕</span>
+                </div>
+              )}
               <span className="absolute bottom-2 left-2 text-xs font-medium px-2 py-0.5 rounded-full bg-black/50 text-white">
                 改造前
               </span>
             </div>
             <div className="aspect-square bg-earth-50 relative overflow-hidden">
-              <img
-                src={template.afterImage}
-                alt="改造后"
-                className="w-full h-full object-cover"
-              />
+              {!afterImageError ? (
+                <img
+                  src={template.afterImage}
+                  alt="改造后"
+                  className="w-full h-full object-cover"
+                  onError={() => setAfterImageError(true)}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-earth-400">
+                  <span className="text-3xl">✨</span>
+                </div>
+              )}
               <span className="absolute bottom-2 left-2 text-xs font-medium px-2 py-0.5 rounded-full bg-sage-500 text-white">
                 改造后
               </span>
@@ -110,19 +139,33 @@ export default function TransformCard({ template }: TransformCardProps) {
 
             <div className="overflow-y-auto p-5">
               <div className="grid grid-cols-2 gap-2 mb-5">
-                <div className="aspect-square rounded-xl overflow-hidden">
-                  <img
-                    src={template.beforeImage}
-                    alt="改造前"
-                    className="w-full h-full object-cover"
-                  />
+                <div className="aspect-square rounded-xl overflow-hidden bg-earth-50">
+                  {!beforeImageError ? (
+                    <img
+                      src={template.beforeImage}
+                      alt="改造前"
+                      className="w-full h-full object-cover"
+                      onError={() => setBeforeImageError(true)}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-earth-400">
+                      <span className="text-4xl">👕</span>
+                    </div>
+                  )}
                 </div>
-                <div className="aspect-square rounded-xl overflow-hidden">
-                  <img
-                    src={template.afterImage}
-                    alt="改造后"
-                    className="w-full h-full object-cover"
-                  />
+                <div className="aspect-square rounded-xl overflow-hidden bg-earth-50">
+                  {!afterImageError ? (
+                    <img
+                      src={template.afterImage}
+                      alt="改造后"
+                      className="w-full h-full object-cover"
+                      onError={() => setAfterImageError(true)}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-earth-400">
+                      <span className="text-4xl">✨</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Trash2, Save, Shuffle, X, Palette as PaletteIcon } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 import { ClothingItem, ClothingCategory, CATEGORY_LABELS } from '@/types';
@@ -28,6 +28,20 @@ export default function Styling() {
   const removeFromCanvas = useStore((state) => state.removeFromCanvas);
   const clearCanvas = useStore((state) => state.clearCanvas);
   const addOutfit = useStore((state) => state.addOutfit);
+
+  useEffect(() => {
+    if (!showSaveModal) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowSaveModal(false);
+        setSavedOutfitName('');
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showSaveModal]);
 
   const filteredItems = clothingItems.filter((item) => item.category === activeCategory);
   const canvasClothingItems = currentCanvasItems
