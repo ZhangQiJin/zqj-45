@@ -21,7 +21,7 @@ import {
 } from '@/types';
 import { generateId } from '@/utils/image';
 import { sceneRecommendations } from '@/data/scenes';
-import { useWardrobeStore } from './useWardrobeStore';
+import { useWardrobeStore, migrateClothingItems } from './useWardrobeStore';
 import { useCanvasStore } from './useCanvasStore';
 import { useOutfitStore } from './useOutfitStore';
 import { useTransformStore } from './useTransformStore';
@@ -95,13 +95,6 @@ interface AppState {
   recordPreference: (scene: SceneType, items: ClothingItem[]) => void;
   getScenePreference: (scene: SceneType) => ScenePreference | undefined;
 }
-
-const migrateClothingItems = (items: any[]): ClothingItem[] => {
-  return items.map((item) => ({
-    ...item,
-    tagIds: Array.isArray(item.tagIds) ? item.tagIds : [],
-  }));
-};
 
 export const useStore = create<AppState>()(
   persist(
