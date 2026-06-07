@@ -17,20 +17,21 @@ export default function TransformCard({ template }: TransformCardProps) {
 
   const toggleLikeTransform = useStore((state) => state.toggleLikeTransform);
   const toggleFavoriteTransform = useStore((state) => state.toggleFavoriteTransform);
-  const isTransformLiked = useStore((state) => state.isTransformLiked);
-  const isTransformFavorited = useStore((state) => state.isTransformFavorited);
-  const getTransformLikes = useStore((state) => state.getTransformLikes);
-  const getTransformProgress = useStore((state) => state.getTransformProgress);
-  const isTransformCompleted = useStore((state) => state.isTransformCompleted);
-  const getTransformExecution = useStore((state) => state.getTransformExecution);
+  const likedTransformIds = useStore((state) => state.likedTransformIds);
+  const favoritedTransformIds = useStore((state) => state.favoritedTransformIds);
+  const transformExecutions = useStore((state) => state.transformExecutions);
+  const userTransforms = useStore((state) => state.userTransforms);
 
-  const isLiked = template.isUserCreated ? isTransformLiked(template.id) : false;
-  const isFavorited = isTransformFavorited(template.id);
-  const likeCount = template.isUserCreated ? getTransformLikes(template.id) : (template.likes || 0);
-  const progress = getTransformProgress(template.id);
-  const isCompleted = isTransformCompleted(template.id);
-  const execution = getTransformExecution(template.id);
+  const isLiked = template.isUserCreated ? likedTransformIds.includes(template.id) : false;
+  const isFavorited = favoritedTransformIds.includes(template.id);
+  const userTransform = template.isUserCreated ? userTransforms.find((t) => t.id === template.id) : undefined;
+  const likeCount = userTransform ? userTransform.likes : (template.likes || 0);
+  const execution = transformExecutions.find((e) => e.transformId === template.id);
   const hasStarted = !!execution;
+  const progress = execution && execution.stepProgress.length > 0
+    ? (execution.stepProgress.filter((s) => s.completed).length / execution.stepProgress.length) * 100
+    : 0;
+  const isCompleted = execution ? execution.stepProgress.every((s) => s.completed) : false;
 
   useEffect(() => {
     if (!showSteps) return;

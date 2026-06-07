@@ -11,12 +11,12 @@ interface TransformExecutionModalProps {
 }
 
 export default function TransformExecutionModal({ template, isOpen, onClose }: TransformExecutionModalProps) {
-  const getTransformExecution = useStore((state) => state.getTransformExecution);
+  const transformExecutions = useStore((state) => state.transformExecutions);
   const startTransformExecution = useStore((state) => state.startTransformExecution);
   const updateStepProgress = useStore((state) => state.updateStepProgress);
   const removeTransformExecution = useStore((state) => state.removeTransformExecution);
 
-  const execution = getTransformExecution(template.id);
+  const execution = transformExecutions.find((e) => e.transformId === template.id);
   const [stepNotes, setStepNotes] = useState<Record<number, string>>({});
 
   useEffect(() => {

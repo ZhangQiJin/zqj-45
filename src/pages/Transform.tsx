@@ -22,7 +22,7 @@ export default function Transform() {
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState<TransformCategory | 'all' | 'favorites'>('all');
   const userTransforms = useStore((state) => state.userTransforms);
-  const isTransformFavorited = useStore((state) => state.isTransformFavorited);
+  const favoritedTransformIds = useStore((state) => state.favoritedTransformIds);
 
   const allTemplates = useMemo(() => {
     return [
@@ -39,10 +39,10 @@ export default function Transform() {
       return userTransforms;
     }
     if (activeCategory === 'favorites') {
-      return allTemplates.filter((t) => isTransformFavorited(t.id));
+      return allTemplates.filter((t) => favoritedTransformIds.includes(t.id));
     }
     return allTemplates.filter((t) => t.category === activeCategory);
-  }, [activeCategory, allTemplates, userTransforms, isTransformFavorited]);
+  }, [activeCategory, allTemplates, userTransforms, favoritedTransformIds]);
 
   return (
     <div className="min-h-screen pb-20 md:pb-8">
