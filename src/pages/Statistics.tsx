@@ -56,7 +56,7 @@ export default function Statistics() {
   );
 
   const clothingItems = useStore((state) => state.clothingItems);
-  const getAllClothingWearStats = useStore((state) => state.getAllClothingWearStats);
+  const wearRecords = useStore((state) => state.wearRecords);
 
   const now = Date.now();
   const timeRangeMs = {
@@ -70,6 +70,19 @@ export default function Statistics() {
     const cutoff = now - timeRangeMs[timeRange];
     return clothingItems.filter((item) => item.createdAt >= cutoff);
   }, [clothingItems, timeRange, now]);
+
+  const monthlyAverageDenominator = useMemo(() => {
+    if (timeRange === 'quarter') return 3;
+    if (timeRange === 'year') return 12;
+    if (filteredItems.length === 0) return 1;
+    const earliestDate = new Date(Math.min(...filteredItems.map((item) => item.createdAt)));
+    const nowDate = new Date();
+    const monthsDiff =
+      (nowDate.getFullYear() - earliestDate.getFullYear()) * 12 +
+      (nowDate.getMonth() - earliestDate.getMonth()) +
+      1;
+    return Math.max(monthsDiff, 1);
+  }, [filteredItems, timeRange]);
 
   const categoryData = useMemo(() => {
     const counts: Record<ClothingCategory, number> = {
@@ -123,7 +136,25 @@ export default function Statistics() {
   }, [filteredItems]);
 
   const wearFrequencyData = useMemo(() => {
-    const allStats = getAllClothingWearStats();
+    const cutoffDate =
+      timeRange === 'all'
+        ? null
+        : new Date(now - timeRangeMs[timeRange]).toISOString().split('T')[0];
+
+    const itemWearCounts: Record<string, number> = {};
+    filteredItems.forEach((item) => {
+      itemWearCounts[item.id] = 0;
+    });
+
+    wearRecords.forEach((record) => {
+      if (cutoffDate && record.date < cutoffDate) return;
+      record.clothingIds.forEach((clothingId) => {
+        if (itemWearCounts.hasOwnProperty(clothingId)) {
+          itemWearCounts[clothingId]++;
+        }
+      });
+    });
+
     const categoryWears: Record<ClothingCategory, { total: number; count: number }> = {
       top: { total: 0, count: 0 },
       bottom: { total: 0, count: 0 },
@@ -134,11 +165,9 @@ export default function Statistics() {
     };
 
     filteredItems.forEach((item) => {
-      const stats = allStats.get(item.id);
-      if (stats) {
-        categoryWears[item.category].total += stats.totalWears;
-        categoryWears[item.category].count++;
-      }
+      const wearCount = itemWearCounts[item.id] || 0;
+      categoryWears[item.category].total += wearCount;
+      categoryWears[item.category].count++;
     });
 
     return Object.entries(categoryWears)
@@ -148,7 +177,7 @@ export default function Statistics() {
         category: key as ClothingCategory,
       }))
       .filter((item) => activeCategories.has(item.category));
-  }, [filteredItems, getAllClothingWearStats, activeCategories]);
+  }, [filteredItems, wearRecords, timeRange, now, activeCategories]);
 
   const toggleCategory = (category: ClothingCategory) => {
     setActiveCategories((prev) => {
@@ -231,8 +260,8 @@ export default function Statistics() {
               <span className="text-earth-500 text-sm">月均新增</span>
             </div>
             <p className="text-3xl font-bold text-earth-800">
-              {monthlyData.length > 0
-                ? Math.round((totalItems / monthlyData.length) * 10) / 10
+              {filteredItems.length > 0
+                ? Math.round((filteredItems.length / monthlyAverageDenominator) * 10) / 10
                 : 0}
             </p>
           </div>
