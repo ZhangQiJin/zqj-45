@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ClothingItem, Outfit, CanvasItem, SceneType, ClothingCategory, WearRecord, ClothingWearStats, Tag, DEFAULT_TAGS, TAG_RECOMMENDATIONS, UserTransform, TransformCategory, TransformExecution, OutfitCanvasItem, ExportData } from '@/types';
+import { ClothingItem, Outfit, CanvasItem, SceneType, ClothingCategory, WearRecord, ClothingWearStats, Tag, DEFAULT_TAGS, TAG_RECOMMENDATIONS, UserTransform, TransformCategory, TransformExecution, OutfitCanvasItem, ExportData, UserPreferences, ScenePreference } from '@/types';
 import { generateId } from '@/utils/image';
 import { sceneRecommendations } from '@/data/scenes';
 
@@ -67,6 +67,10 @@ interface AppState {
   removeTransformExecution: (transformId: string) => void;
 
   importData: (data: ExportData) => void;
+
+  userPreferences: UserPreferences;
+  recordPreference: (scene: SceneType, items: ClothingItem[]) => void;
+  getScenePreference: (scene: SceneType) => ScenePreference | undefined;
 }
 
 const migrateClothingItems = (items: any[]): ClothingItem[] => {
@@ -88,6 +92,10 @@ export const useStore = create<AppState>()(
       likedTransformIds: [],
       favoritedTransformIds: [],
       transformExecutions: [],
+      userPreferences: {
+        scenePreferences: [],
+        totalFeedbacks: 0,
+      },
 
       addClothingItem: (item) => {
         set((state) => ({
@@ -237,79 +245,196 @@ export const useStore = create<AppState>()(
       },
 
       getRandomOutfitForScene: (scene) => {
-        const { clothingItems } = get();
+        const { clothingItems, getScenePreference } = get();
         const sceneData = sceneRecommendations.find((s) => s.scene === scene);
         const suggestedCategories = (sceneData?.suggestedCategories as ClothingCategory[]) || [
           'top',
           'bottom',
           'shoes',
         ];
+        const scenePref = getScenePreference(scene);
 
-        const result: ClothingItem[] = [];
-        const usedCategories = new Set<string>();
-
-        const getRandomItem = (category: ClothingCategory): ClothingItem | null => {
+        const getWeightedRandomItem = (
+          category: ClothingCategory,
+          selectedItems: ClothingItem[]
+        ): ClothingItem | null => {
           const items = clothingItems.filter(
-            (i) => i.category === category && !result.includes(i)
+            (i) => i.category === category && !selectedItems.some((si) => si.id === i.id)
           );
           if (items.length === 0) return null;
-          return items[Math.floor(Math.random() * items.length)];
+
+          const selectedColors = selectedItems.map((i) => i.color);
+          
+          const weights = items.map((item) => {
+            let weight = 1;
+            
+            if (scenePref && selectedColors.length > 0) {
+              selectedColors.forEach((sc) => {
+                const colorPair = scenePref.colorPairPreferences.find(
+                  (cp) =>
+                    (cp.color1 === sc && cp.color2 === item.color) ||
+                    (cp.color1 === item.color && cp.color2 === sc)
+                );
+                if (colorPair) {
+                  weight += colorPair.count * 0.5;
+                }
+              });
+            }
+            
+            return weight;
+          });
+
+          const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+          let random = Math.random() * totalWeight;
+          
+          for (let i = 0; i < items.length; i++) {
+            random -= weights[i];
+            if (random <= 0) {
+              return items[i];
+            }
+          }
+          
+          return items[items.length - 1];
         };
 
-        const hasDressSuggested = suggestedCategories.includes('dress');
-        const hasTopBottomSuggested =
-          suggestedCategories.includes('top') && suggestedCategories.includes('bottom');
+        const generateCandidateOutfits = (): ClothingItem[][] => {
+          const candidates: ClothingItem[][] = [];
+          
+          for (let attempt = 0; attempt < 5; attempt++) {
+            const result: ClothingItem[] = [];
+            const usedCategories = new Set<string>();
 
-        if (hasDressSuggested && (!hasTopBottomSuggested || Math.random() > 0.4)) {
-          const dress = getRandomItem('dress');
-          if (dress) {
-            result.push(dress);
-            usedCategories.add('dress');
-          }
-        }
+            const hasDressSuggested = suggestedCategories.includes('dress');
+            const hasTopBottomSuggested =
+              suggestedCategories.includes('top') && suggestedCategories.includes('bottom');
 
-        if (!usedCategories.has('dress')) {
-          if (suggestedCategories.includes('top')) {
-            const top = getRandomItem('top');
-            if (top) {
-              result.push(top);
-              usedCategories.add('top');
+            let useDress = false;
+            if (hasDressSuggested) {
+              if (scenePref) {
+                const dressCombos = scenePref.categoryPreferences.filter((cp) =>
+                  cp.categories.includes('dress')
+                );
+                const topBottomCombos = scenePref.categoryPreferences.filter((cp) =>
+                  cp.categories.includes('top') && cp.categories.includes('bottom')
+                );
+                const dressScore = dressCombos.reduce((sum, c) => sum + c.count, 0);
+                const tbScore = topBottomCombos.reduce((sum, c) => sum + c.count, 0);
+                const total = dressScore + tbScore + 1;
+                useDress = Math.random() < (dressScore + 0.4) / total;
+              } else {
+                useDress = !hasTopBottomSuggested || Math.random() > 0.4;
+              }
+            }
+
+            if (useDress) {
+              const dress = getWeightedRandomItem('dress', result);
+              if (dress) {
+                result.push(dress);
+                usedCategories.add('dress');
+              }
+            }
+
+            if (!usedCategories.has('dress')) {
+              if (suggestedCategories.includes('top')) {
+                const top = getWeightedRandomItem('top', result);
+                if (top) {
+                  result.push(top);
+                  usedCategories.add('top');
+                }
+              }
+              if (suggestedCategories.includes('bottom')) {
+                const bottom = getWeightedRandomItem('bottom', result);
+                if (bottom) {
+                  result.push(bottom);
+                  usedCategories.add('bottom');
+                }
+              }
+            }
+
+            if (suggestedCategories.includes('outerwear')) {
+              const outerwear = getWeightedRandomItem('outerwear', result);
+              if (outerwear) {
+                result.push(outerwear);
+                usedCategories.add('outerwear');
+              }
+            }
+
+            if (suggestedCategories.includes('shoes')) {
+              const shoe = getWeightedRandomItem('shoes', result);
+              if (shoe) {
+                result.push(shoe);
+                usedCategories.add('shoes');
+              }
+            }
+
+            const accessoryChance = scenePref ? 0.5 : 0.8;
+            if (suggestedCategories.includes('accessory') && Math.random() > accessoryChance) {
+              const accessory = getWeightedRandomItem('accessory', result);
+              if (accessory) {
+                result.push(accessory);
+                usedCategories.add('accessory');
+              }
+            }
+
+            if (result.length > 0) {
+              candidates.push(result);
             }
           }
-          if (suggestedCategories.includes('bottom')) {
-            const bottom = getRandomItem('bottom');
-            if (bottom) {
-              result.push(bottom);
-              usedCategories.add('bottom');
+          
+          return candidates;
+        };
+
+        const candidates = generateCandidateOutfits();
+        if (candidates.length === 0) return [];
+
+        if (!scenePref || scenePref.categoryPreferences.length === 0) {
+          return candidates[Math.floor(Math.random() * candidates.length)];
+        }
+
+        const candidateScores = candidates.map((candidate) => {
+          let score = 0;
+          const categories = candidate.map((i) => i.category).sort();
+          
+          scenePref.categoryPreferences.forEach((cp) => {
+            const matchCount = cp.categories.filter((c) => categories.includes(c)).length;
+            const totalCount = Math.max(cp.categories.length, categories.length);
+            const similarity = matchCount / totalCount;
+            score += similarity * cp.count * 2;
+          });
+          
+          for (let i = 0; i < candidate.length; i++) {
+            for (let j = i + 1; j < candidate.length; j++) {
+              const colorPair = scenePref.colorPairPreferences.find(
+                (cp) =>
+                  (cp.color1 === candidate[i].color && cp.color2 === candidate[j].color) ||
+                  (cp.color1 === candidate[j].color && cp.color2 === candidate[i].color)
+              );
+              if (colorPair) {
+                score += colorPair.count;
+              }
             }
           }
+          
+          return score;
+        });
+
+        const maxScore = Math.max(...candidateScores);
+        if (maxScore === 0) {
+          return candidates[Math.floor(Math.random() * candidates.length)];
         }
 
-        if (suggestedCategories.includes('outerwear')) {
-          const outerwear = getRandomItem('outerwear');
-          if (outerwear) {
-            result.push(outerwear);
-            usedCategories.add('outerwear');
+        const weights = candidateScores.map((s) => s + 1);
+        const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+        let random = Math.random() * totalWeight;
+        
+        for (let i = 0; i < candidates.length; i++) {
+          random -= weights[i];
+          if (random <= 0) {
+            return candidates[i];
           }
         }
 
-        if (suggestedCategories.includes('shoes')) {
-          const shoe = getRandomItem('shoes');
-          if (shoe) {
-            result.push(shoe);
-            usedCategories.add('shoes');
-          }
-        }
-
-        if (suggestedCategories.includes('accessory') && Math.random() > 0.2) {
-          const accessory = getRandomItem('accessory');
-          if (accessory) {
-            result.push(accessory);
-            usedCategories.add('accessory');
-          }
-        }
-
-        return result;
+        return candidates[candidates.length - 1];
       },
 
       addWearRecord: (record) => {
@@ -697,6 +822,90 @@ export const useStore = create<AppState>()(
           };
         });
       },
+
+      getScenePreference: (scene) => {
+        return get().userPreferences.scenePreferences.find((sp) => sp.scene === scene);
+      },
+
+      recordPreference: (scene, items) => {
+        set((state) => {
+          const categories = items.map((i) => i.category).sort();
+          const colors = items.map((i) => i.color);
+          const colorPairs: string[][] = [];
+          for (let i = 0; i < colors.length; i++) {
+            for (let j = i + 1; j < colors.length; j++) {
+              const pair = [colors[i], colors[j]].sort();
+              colorPairs.push(pair);
+            }
+          }
+
+          const scenePrefIndex = state.userPreferences.scenePreferences.findIndex(
+            (sp) => sp.scene === scene
+          );
+
+          let updatedScenePrefs = [...state.userPreferences.scenePreferences];
+
+          if (scenePrefIndex === -1) {
+            updatedScenePrefs.push({
+              scene,
+              categoryPreferences: [{ categories, count: 1 }],
+              colorPairPreferences: colorPairs.map(([c1, c2]) => ({
+                color1: c1,
+                color2: c2,
+                count: 1,
+              })),
+            });
+          } else {
+            const existingPref = updatedScenePrefs[scenePrefIndex];
+            
+            const catPrefIndex = existingPref.categoryPreferences.findIndex(
+              (cp) =>
+                cp.categories.length === categories.length &&
+                cp.categories.every((c, idx) => c === categories[idx])
+            );
+
+            let updatedCatPrefs = [...existingPref.categoryPreferences];
+            if (catPrefIndex === -1) {
+              updatedCatPrefs.push({ categories, count: 1 });
+            } else {
+              updatedCatPrefs[catPrefIndex] = {
+                ...updatedCatPrefs[catPrefIndex],
+                count: updatedCatPrefs[catPrefIndex].count + 1,
+              };
+            }
+
+            let updatedColorPrefs = [...existingPref.colorPairPreferences];
+            colorPairs.forEach(([c1, c2]) => {
+              const colorIndex = updatedColorPrefs.findIndex(
+                (cp) =>
+                  (cp.color1 === c1 && cp.color2 === c2) ||
+                  (cp.color1 === c2 && cp.color2 === c1)
+              );
+              if (colorIndex === -1) {
+                updatedColorPrefs.push({ color1: c1, color2: c2, count: 1 });
+              } else {
+                updatedColorPrefs[colorIndex] = {
+                  ...updatedColorPrefs[colorIndex],
+                  count: updatedColorPrefs[colorIndex].count + 1,
+                };
+              }
+            });
+
+            updatedScenePrefs[scenePrefIndex] = {
+              ...existingPref,
+              categoryPreferences: updatedCatPrefs,
+              colorPairPreferences: updatedColorPrefs,
+            };
+          }
+
+          return {
+            userPreferences: {
+              scenePreferences: updatedScenePrefs,
+              totalFeedbacks: state.userPreferences.totalFeedbacks + 1,
+            },
+          };
+        });
+      },
     }),
     {
       name: 'wardrobe-storage',
@@ -709,6 +918,7 @@ export const useStore = create<AppState>()(
         likedTransformIds: state.likedTransformIds,
         favoritedTransformIds: state.favoritedTransformIds,
         transformExecutions: state.transformExecutions,
+        userPreferences: state.userPreferences,
       }),
       onRehydrateStorage: () => (state) => {
         if (state && state.clothingItems) {

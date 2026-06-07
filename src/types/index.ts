@@ -200,3 +200,25 @@ export interface ClothingWearStats {
   lastWornDate: string | null;
   wearDates: string[];
 }
+
+export interface CategoryPreference {
+  categories: ClothingCategory[];
+  count: number;
+}
+
+export interface ColorPairPreference {
+  color1: string;
+  color2: string;
+  count: number;
+}
+
+export interface ScenePreference {
+  scene: SceneType;
+  categoryPreferences: CategoryPreference[];
+  colorPairPreferences: ColorPairPreference[];
+}
+
+export interface UserPreferences {
+  scenePreferences: ScenePreference[];
+  totalFeedbacks: number;
+}

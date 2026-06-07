@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles, Lightbulb, RefreshCw } from 'lucide-react';
+import { Sparkles, Lightbulb, RefreshCw, Heart, X } from 'lucide-react';
 import { SceneType, SCENE_LABELS } from '@/types';
 import { sceneRecommendations } from '@/data/scenes';
 import { useStore } from '@/store/useStore';
@@ -11,8 +11,11 @@ const scenes: SceneType[] = ['class', 'commute', 'travel', 'photo', 'date'];
 export default function Scenes() {
   const [activeScene, setActiveScene] = useState<SceneType>('class');
   const [recommendedItems, setRecommendedItems] = useState<ReturnType<typeof getRandomOutfitForScene>>([]);
+  const [hasFeedback, setHasFeedback] = useState(false);
   const clothingItems = useStore((state) => state.clothingItems);
   const getRandomOutfitForScene = useStore((state) => state.getRandomOutfitForScene);
+  const recordPreference = useStore((state) => state.recordPreference);
+  const totalFeedbacks = useStore((state) => state.userPreferences.totalFeedbacks);
 
   const currentScene = sceneRecommendations.find((s) => s.scene === activeScene);
 
@@ -23,6 +26,18 @@ export default function Scenes() {
     }
     const items = getRandomOutfitForScene(activeScene);
     setRecommendedItems(items);
+    setHasFeedback(false);
+  };
+
+  const handleLike = () => {
+    if (recommendedItems.length === 0 || hasFeedback) return;
+    recordPreference(activeScene, recommendedItems);
+    setHasFeedback(true);
+  };
+
+  const handleDislike = () => {
+    if (hasFeedback) return;
+    handleGenerate();
   };
 
   return (
@@ -102,6 +117,11 @@ export default function Scenes() {
                         ? '先去衣橱添加衣物，才能获得推荐哦'
                         : '根据场景智能推荐适合的衣物组合'}
                     </p>
+                    {totalFeedbacks > 0 && (
+                      <p className="text-xs text-sage-600 mt-4">
+                        已收集 {totalFeedbacks} 次偏好反馈，推荐会越来越精准～
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div>
@@ -111,22 +131,61 @@ export default function Scenes() {
                       ))}
                     </div>
 
-                    <div className="flex items-center justify-between p-4 bg-earth-50 rounded-xl">
-                      <div>
-                        <p className="text-sm text-earth-600">
-                          共 {recommendedItems.length} 件单品
-                        </p>
-                        <p className="text-xs text-earth-500 mt-0.5">
-                          不满意？再点一次按钮重新生成
-                        </p>
+                    <div className="p-4 bg-earth-50 rounded-xl">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <p className="text-sm text-earth-600">
+                            共 {recommendedItems.length} 件单品
+                          </p>
+                          {totalFeedbacks > 0 && (
+                            <p className="text-xs text-sage-600 mt-0.5">
+                              已学习 {totalFeedbacks} 次偏好，推荐越来越懂你～
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={handleGenerate}
+                          className="btn-secondary flex items-center gap-2 text-sm"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          换一组
+                        </button>
                       </div>
-                      <button
-                        onClick={handleGenerate}
-                        className="btn-secondary flex items-center gap-2 text-sm"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                        换一组
-                      </button>
+
+                      <div className="flex gap-3">
+                        <button
+                          onClick={handleDislike}
+                          disabled={hasFeedback}
+                          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-all ${
+                            hasFeedback
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : 'bg-white border border-earth-200 text-earth-600 hover:border-terracotta-300 hover:text-terracotta-600 hover:bg-terracotta-50'
+                          }`}
+                        >
+                          <X className="w-5 h-5" />
+                          <span className="font-medium">不喜欢</span>
+                        </button>
+                        <button
+                          onClick={handleLike}
+                          disabled={hasFeedback}
+                          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-all ${
+                            hasFeedback
+                              ? 'bg-sage-100 text-sage-700 cursor-default'
+                              : 'bg-sage-500 text-white hover:bg-sage-600 shadow-soft hover:shadow-md'
+                          }`}
+                        >
+                          <Heart className={`w-5 h-5 ${hasFeedback ? 'fill-current' : ''}`} />
+                          <span className="font-medium">
+                            {hasFeedback ? '已记录' : '喜欢'}
+                          </span>
+                        </button>
+                      </div>
+
+                      {hasFeedback && (
+                        <p className="text-center text-xs text-sage-600 mt-3">
+                          🎉 已记录你的偏好，下次推荐会更精准哦！
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
