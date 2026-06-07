@@ -1,5 +1,4 @@
-import { ExportData, EXPORT_DATA_VERSION, Outfit, ClothingItem, Tag, OutfitCanvasItem } from '@/types';
-import { generateId } from './image';
+import { ExportData, EXPORT_DATA_VERSION, Outfit, ClothingItem, Tag } from '@/types';
 
 export interface ValidationResult {
   valid: boolean;
@@ -132,86 +131,31 @@ export const parseImportFile = async (file: File): Promise<ValidationResult> => 
   });
 };
 
-export const processImportData = (
+export interface PreviewImportResult {
+  data: ExportData;
+  newOutfitsCount: number;
+  newClothingCount: number;
+  newTagsCount: number;
+  existingOutfitsCount: number;
+  existingClothingCount: number;
+  existingTagsCount: number;
+}
+
+export const getPreviewImportData = (
   data: ExportData,
   existingClothingIds: Set<string>,
   existingTagNames: Set<string>
-): ImportResult => {
-  const idMapping = new Map<string, string>();
-
-  const newTags: Tag[] = data.tags
-    .filter((tag) => !existingTagNames.has(tag.name))
-    .map((tag) => ({
-      ...tag,
-      id: generateId(),
-      createdAt: Date.now(),
-    }));
-
-  const tagNameToId = new Map<string, string>();
-  newTags.forEach((tag) => tagNameToId.set(tag.name, tag.id));
-
-  const newClothingItems: ClothingItem[] = data.clothingItems
-    .filter((item) => !existingClothingIds.has(item.id))
-    .map((item) => {
-      const newId = generateId();
-      idMapping.set(item.id, newId);
-
-      const newTagIds = (item.tagIds || [])
-        .map((oldTagId) => {
-          const oldTag = data.tags.find((t) => t.id === oldTagId);
-          if (oldTag && tagNameToId.has(oldTag.name)) {
-            return tagNameToId.get(oldTag.name)!;
-          }
-          return null;
-        })
-        .filter((id): id is string => id !== null);
-
-      return {
-        ...item,
-        id: newId,
-        tagIds: newTagIds,
-        createdAt: Date.now(),
-      };
-    });
-
-  const newOutfits: Outfit[] = data.outfits.map((outfit) => {
-    const newItems = outfit.items
-      .map((oldId) => {
-        if (existingClothingIds.has(oldId)) {
-          return oldId;
-        }
-        return idMapping.get(oldId) || null;
-      })
-      .filter((id): id is string => id !== null);
-
-    let newCanvasItems: OutfitCanvasItem[] | undefined = undefined;
-    if (outfit.canvasItems) {
-      newCanvasItems = outfit.canvasItems
-        .map((ci) => {
-          let newClothingId: string | null = null;
-          if (existingClothingIds.has(ci.clothingId)) {
-            newClothingId = ci.clothingId;
-          } else {
-            newClothingId = idMapping.get(ci.clothingId) || null;
-          }
-          if (!newClothingId) return null;
-          return { ...ci, clothingId: newClothingId };
-        })
-        .filter((ci): ci is OutfitCanvasItem => ci !== null);
-    }
-
-    return {
-      ...outfit,
-      id: generateId(),
-      items: newItems,
-      canvasItems: newCanvasItems,
-      createdAt: Date.now(),
-    };
-  });
+): PreviewImportResult => {
+  const existingClothingCount = data.clothingItems.filter((c) => existingClothingIds.has(c.id)).length;
+  const existingTagsCount = data.tags.filter((t) => existingTagNames.has(t.name)).length;
 
   return {
-    outfits: newOutfits,
-    clothingItems: newClothingItems,
-    tags: newTags,
+    data,
+    newOutfitsCount: data.outfits.length,
+    newClothingCount: data.clothingItems.length - existingClothingCount,
+    newTagsCount: data.tags.length - existingTagsCount,
+    existingOutfitsCount: 0,
+    existingClothingCount,
+    existingTagsCount,
   };
 };

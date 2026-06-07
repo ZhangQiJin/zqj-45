@@ -8,7 +8,7 @@ import ColorRecommendation from '@/components/ColorRecommendation';
 import LayerPanel from '@/components/LayerPanel';
 import ImportPreviewModal from '@/components/ImportPreviewModal';
 import { getColorRecommendations, ColorMatchResult } from '@/utils/colorMatching';
-import { exportOutfits, parseImportFile, processImportData, ImportResult, ValidationResult } from '@/utils/outfitImportExport';
+import { exportOutfits, parseImportFile, ValidationResult } from '@/utils/outfitImportExport';
 
 const categories: ClothingCategory[] = [
   'top',
@@ -38,8 +38,7 @@ export default function Styling() {
   const [zoom, setZoom] = useState(1);
   const [alignmentGuides, setAlignmentGuides] = useState<AlignmentGuide[]>([]);
   const [showImportPreview, setShowImportPreview] = useState(false);
-  const [importData, setImportData] = useState<ExportData | null>(null);
-  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [parsedImportData, setParsedImportData] = useState<ExportData | null>(null);
   const [importFileName, setImportFileName] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -54,8 +53,7 @@ export default function Styling() {
   const removeFromCanvas = useStore((state) => state.removeFromCanvas);
   const clearCanvas = useStore((state) => state.clearCanvas);
   const addOutfit = useStore((state) => state.addOutfit);
-  const addClothingItem = useStore((state) => state.addClothingItem);
-  const addTag = useStore((state) => state.addTag);
+  const importDataAction = useStore((state) => state.importData);
   const bringToFront = useStore((state) => state.bringToFront);
   const sendToBack = useStore((state) => state.sendToBack);
   const bringForward = useStore((state) => state.bringForward);
@@ -110,6 +108,19 @@ export default function Styling() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [showSaveModal]);
+
+  useEffect(() => {
+    if (!importError) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setImportError(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [importError]);
 
   const filteredItems = clothingItems.filter((item) => item.category === activeCategory);
   const canvasClothingItems = currentCanvasItems
@@ -367,58 +378,26 @@ export default function Styling() {
       return;
     }
 
-    const existingClothingIds = new Set(clothingItems.map((c) => c.id));
-    const existingTagNames = new Set(tags.map((t) => t.name));
-    const processed = processImportData(result.data, existingClothingIds, existingTagNames);
-
-    setImportData(result.data);
-    setImportResult(processed);
+    setParsedImportData(result.data);
     setImportFileName(file.name);
     setShowImportPreview(true);
     e.target.value = '';
   };
 
   const handleConfirmImport = () => {
-    if (!importResult) return;
+    if (!parsedImportData) return;
 
-    importResult.tags.forEach((tag) => {
-      addTag({ name: tag.name, color: tag.color });
-    });
+    importDataAction(parsedImportData);
 
-    importResult.clothingItems.forEach((item) => {
-      addClothingItem({
-        name: item.name,
-        category: item.category as ClothingCategory,
-        color: item.color,
-        imageUrl: item.imageUrl,
-        tagIds: item.tagIds,
-      });
-    });
-
-    setTimeout(() => {
-      importResult.outfits.forEach((outfit) => {
-        useStore.getState().addOutfit(
-          {
-            name: outfit.name,
-            items: outfit.items,
-            scene: outfit.scene,
-          },
-          outfit.canvasItems
-        );
-      });
-
-      setShowImportPreview(false);
-      setImportData(null);
-      setImportResult(null);
-      setImportFileName('');
-      alert('导入成功！');
-    }, 100);
+    setShowImportPreview(false);
+    setParsedImportData(null);
+    setImportFileName('');
+    alert('导入成功！');
   };
 
   const handleCancelImport = () => {
     setShowImportPreview(false);
-    setImportData(null);
-    setImportResult(null);
+    setParsedImportData(null);
     setImportFileName('');
   };
 
@@ -720,10 +699,11 @@ export default function Styling() {
         </div>
       )}
 
-      {showImportPreview && importData && importResult && (
+      {showImportPreview && parsedImportData && (
         <ImportPreviewModal
-          data={importData}
-          importResult={importResult}
+          data={parsedImportData}
+          existingClothingIds={new Set(clothingItems.map((c) => c.id))}
+          existingTagNames={new Set(tags.map((t) => t.name))}
           fileName={importFileName}
           onConfirm={handleConfirmImport}
           onCancel={handleCancelImport}

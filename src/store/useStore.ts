@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ClothingItem, Outfit, CanvasItem, SceneType, ClothingCategory, WearRecord, ClothingWearStats, Tag, DEFAULT_TAGS, TAG_RECOMMENDATIONS, UserTransform, TransformCategory, TransformExecution, OutfitCanvasItem } from '@/types';
+import { ClothingItem, Outfit, CanvasItem, SceneType, ClothingCategory, WearRecord, ClothingWearStats, Tag, DEFAULT_TAGS, TAG_RECOMMENDATIONS, UserTransform, TransformCategory, TransformExecution, OutfitCanvasItem, ExportData } from '@/types';
 import { generateId } from '@/utils/image';
 import { sceneRecommendations } from '@/data/scenes';
 
@@ -65,6 +65,8 @@ interface AppState {
   getTransformProgress: (transformId: string) => number;
   isTransformCompleted: (transformId: string) => boolean;
   removeTransformExecution: (transformId: string) => void;
+
+  importData: (data: ExportData) => void;
 }
 
 const migrateClothingItems = (items: any[]): ClothingItem[] => {
@@ -612,6 +614,88 @@ export const useStore = create<AppState>()(
         set((state) => ({
           transformExecutions: state.transformExecutions.filter((e) => e.transformId !== transformId),
         }));
+      },
+
+      importData: (data) => {
+        set((state) => {
+          const existingTagNames = new Set(state.tags.map((t) => t.name));
+          const newTags: Tag[] = data.tags
+            .filter((tag) => !existingTagNames.has(tag.name))
+            .map((tag) => ({
+              ...tag,
+              id: generateId(),
+              createdAt: Date.now(),
+            }));
+
+          const tagNameToId = new Map<string, string>();
+          newTags.forEach((tag) => tagNameToId.set(tag.name, tag.id));
+          state.tags.forEach((tag) => tagNameToId.set(tag.name, tag.id));
+
+          const existingClothingIds = new Set(state.clothingItems.map((c) => c.id));
+          const clothingIdMapping = new Map<string, string>();
+          const newClothingItems: ClothingItem[] = data.clothingItems
+            .filter((item) => !existingClothingIds.has(item.id))
+            .map((item) => {
+              const newId = generateId();
+              clothingIdMapping.set(item.id, newId);
+
+              const mappedTagIds = (item.tagIds || [])
+                .map((oldTagId) => {
+                  const oldTag = data.tags.find((t) => t.id === oldTagId);
+                  if (oldTag && tagNameToId.has(oldTag.name)) {
+                    return tagNameToId.get(oldTag.name)!;
+                  }
+                  return null;
+                })
+                .filter((id): id is string => id !== null);
+
+              return {
+                ...item,
+                id: newId,
+                tagIds: mappedTagIds,
+                createdAt: Date.now(),
+              };
+            });
+
+          const newOutfits: Outfit[] = data.outfits.map((outfit) => {
+            const mappedItems = outfit.items
+              .map((oldId) => {
+                if (existingClothingIds.has(oldId)) return oldId;
+                return clothingIdMapping.get(oldId) || null;
+              })
+              .filter((id): id is string => id !== null);
+
+            let mappedCanvasItems: OutfitCanvasItem[] | undefined = undefined;
+            if (outfit.canvasItems) {
+              mappedCanvasItems = outfit.canvasItems
+                .map((ci) => {
+                  let newClothingId: string | null = null;
+                  if (existingClothingIds.has(ci.clothingId)) {
+                    newClothingId = ci.clothingId;
+                  } else {
+                    newClothingId = clothingIdMapping.get(ci.clothingId) || null;
+                  }
+                  if (!newClothingId) return null;
+                  return { ...ci, clothingId: newClothingId };
+                })
+                .filter((ci): ci is OutfitCanvasItem => ci !== null);
+            }
+
+            return {
+              ...outfit,
+              id: generateId(),
+              items: mappedItems,
+              canvasItems: mappedCanvasItems,
+              createdAt: Date.now(),
+            };
+          });
+
+          return {
+            tags: [...state.tags, ...newTags],
+            clothingItems: [...state.clothingItems, ...newClothingItems],
+            outfits: [...state.outfits, ...newOutfits],
+          };
+        });
       },
     }),
     {
