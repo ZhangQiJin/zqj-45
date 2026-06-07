@@ -1,9 +1,11 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Trash2, Save, Shuffle, X, Palette as PaletteIcon } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 import { ClothingItem, ClothingCategory, CATEGORY_LABELS } from '@/types';
 import ClothingCard from '@/components/ClothingCard';
 import CategoryTag from '@/components/CategoryTag';
+import ColorRecommendation from '@/components/ColorRecommendation';
+import { getColorRecommendations, ColorMatchResult } from '@/utils/colorMatching';
 
 const categories: ClothingCategory[] = [
   'top',
@@ -19,6 +21,7 @@ export default function Styling() {
   const [draggedItem, setDraggedItem] = useState<ClothingItem | null>(null);
   const [savedOutfitName, setSavedOutfitName] = useState('');
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [baseItem, setBaseItem] = useState<ClothingItem | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const clothingItems = useStore((state) => state.clothingItems);
@@ -28,6 +31,31 @@ export default function Styling() {
   const removeFromCanvas = useStore((state) => state.removeFromCanvas);
   const clearCanvas = useStore((state) => state.clearCanvas);
   const addOutfit = useStore((state) => state.addOutfit);
+
+  const canvasItemIds = useMemo(
+    () => currentCanvasItems.map((c) => c.clothingId),
+    [currentCanvasItems]
+  );
+
+  const recommendations: ColorMatchResult[] = useMemo(() => {
+    if (!baseItem) return [];
+    return getColorRecommendations(baseItem, clothingItems, canvasItemIds);
+  }, [baseItem, clothingItems, canvasItemIds]);
+
+  useEffect(() => {
+    if (currentCanvasItems.length === 0) {
+      setBaseItem(null);
+      return;
+    }
+    if (baseItem && currentCanvasItems.find((c) => c.clothingId === baseItem.id)) {
+      return;
+    }
+    const firstCanvasItemId = currentCanvasItems[0]?.clothingId;
+    const firstItem = clothingItems.find((c) => c.id === firstCanvasItemId);
+    if (firstItem) {
+      setBaseItem(firstItem);
+    }
+  }, [currentCanvasItems, clothingItems, baseItem]);
 
   useEffect(() => {
     if (!showSaveModal) return;
@@ -70,7 +98,21 @@ export default function Styling() {
     const y = e.clientY - rect.top - 80;
 
     addToCanvas(draggedItem.id, Math.max(0, x), Math.max(0, y));
+    if (!baseItem) {
+      setBaseItem(draggedItem);
+    }
     setDraggedItem(null);
+  };
+
+  const handleAddRecommendationToCanvas = (item: ClothingItem) => {
+    const existingCount = currentCanvasItems.length;
+    const x = 50 + (existingCount % 3) * 140;
+    const y = 50 + Math.floor(existingCount / 3) * 180;
+    addToCanvas(item.id, x, y);
+  };
+
+  const handleClothingCardClick = (item: ClothingItem) => {
+    setBaseItem(item);
   };
 
   const handleCanvasItemDrag = useCallback(
@@ -173,8 +215,8 @@ export default function Styling() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-1 order-2 lg:order-1">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-3 order-2 lg:order-1 space-y-4">
             <div className="bg-white rounded-2xl shadow-soft p-4">
               <h3 className="font-semibold text-earth-800 mb-3">选择衣物</h3>
               <div className="flex flex-wrap gap-1.5 mb-4">
@@ -189,7 +231,7 @@ export default function Styling() {
                 ))}
               </div>
 
-              <div className="space-y-3 max-h-[500px] overflow-y-auto scrollbar-hide pr-1">
+              <div className="space-y-3 max-h-[340px] overflow-y-auto scrollbar-hide pr-1">
                 {filteredItems.length === 0 ? (
                   <div className="text-center py-8 text-earth-400 text-sm">
                     <PaletteIcon className="w-10 h-10 mx-auto mb-2 opacity-50" />
@@ -203,15 +245,26 @@ export default function Styling() {
                       showDelete={false}
                       draggable
                       onDragStart={handleDragStart}
-                      className="!shadow-none !border border-earth-100 hover:!border-sage-300"
+                      onClick={() => handleClothingCardClick(item)}
+                      className={`!shadow-none !border transition-all ${
+                        baseItem?.id === item.id
+                          ? '!border-sage-400 !ring-2 !ring-sage-200'
+                          : 'border-earth-100 hover:!border-sage-300'
+                      }`}
                     />
                   ))
                 )}
               </div>
             </div>
+
+            <ColorRecommendation
+              baseItem={baseItem}
+              recommendations={recommendations}
+              onAddToCanvas={handleAddRecommendationToCanvas}
+            />
           </div>
 
-          <div className="lg:col-span-3 order-1 lg:order-2">
+          <div className="lg:col-span-9 order-1 lg:order-2">
             <div
               ref={canvasRef}
               className="bg-white rounded-2xl shadow-soft dashed-grid min-h-[500px] lg:min-h-[600px] relative overflow-hidden"
