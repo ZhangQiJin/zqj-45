@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { CanvasItem } from '@/types';
+import { stateLogger } from '@/monitoring';
 
 interface CanvasState {
   currentCanvasItems: CanvasItem[];
@@ -14,7 +15,9 @@ interface CanvasState {
   sendBackward: (clothingId: string) => void;
 }
 
-export const useCanvasStore = create<CanvasState>()((set, get) => ({
+export const useCanvasStore = create<CanvasState>()(
+  stateLogger(
+    (set, get) => ({
   currentCanvasItems: [],
 
   updateCanvasItems: (items) => {
@@ -118,4 +121,7 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
       };
     });
   },
-}));
+}),
+    { storeName: 'CanvasStore' }
+  )
+);

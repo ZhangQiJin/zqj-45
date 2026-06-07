@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Outfit, OutfitCanvasItem, UserPreferences, ScenePreference, SceneType, ClothingItem } from '@/types';
 import { generateId } from '@/utils/image';
+import { stateLogger } from '@/monitoring';
 
 interface OutfitState {
   outfits: Outfit[];
@@ -13,7 +14,9 @@ interface OutfitState {
   getScenePreference: (scene: SceneType) => ScenePreference | undefined;
 }
 
-export const useOutfitStore = create<OutfitState>()((set, get) => ({
+export const useOutfitStore = create<OutfitState>()(
+  stateLogger(
+    (set, get) => ({
   outfits: [],
   userPreferences: {
     scenePreferences: [],
@@ -118,4 +121,7 @@ export const useOutfitStore = create<OutfitState>()((set, get) => ({
       };
     });
   },
-}));
+}),
+    { storeName: 'OutfitStore' }
+  )
+);

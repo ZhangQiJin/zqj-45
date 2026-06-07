@@ -26,6 +26,7 @@ import { useCanvasStore } from './useCanvasStore';
 import { useOutfitStore } from './useOutfitStore';
 import { useTransformStore } from './useTransformStore';
 import { getRandomOutfitForScene as getRandomOutfitForSceneService } from '@/services/outfitRecommendationService';
+import { stateLogger } from '@/monitoring';
 
 interface AppState {
   clothingItems: ClothingItem[];
@@ -98,7 +99,8 @@ interface AppState {
 
 export const useStore = create<AppState>()(
   persist(
-    (set, get) => ({
+    stateLogger(
+      (set, get) => ({
       clothingItems: [],
       outfits: [],
       currentCanvasItems: [],
@@ -487,6 +489,8 @@ export const useStore = create<AppState>()(
         set({ userPreferences: useOutfitStore.getState().userPreferences });
       },
     }),
+      { storeName: 'AppStore' }
+    ),
     {
       name: 'wardrobe-storage',
       partialize: (state) => ({

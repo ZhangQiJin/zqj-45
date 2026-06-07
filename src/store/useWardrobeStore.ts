@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { ClothingItem, WearRecord, ClothingWearStats, Tag, DEFAULT_TAGS, TAG_RECOMMENDATIONS, ClothingCategory } from '@/types';
 import { generateId } from '@/utils/image';
+import { stateLogger } from '@/monitoring';
 
 interface WardrobeState {
   clothingItems: ClothingItem[];
@@ -37,7 +38,10 @@ export const migrateClothingItems = (items: any[]): ClothingItem[] => {
   }));
 };
 
-export const useWardrobeStore = create<WardrobeState>()((set, get) => ({
+export const useWardrobeStore = create<WardrobeState>()(
+  stateLogger(
+    (set, get) => ({
+
   clothingItems: [],
   wearRecords: [],
   tags: [],
@@ -220,4 +224,7 @@ export const useWardrobeStore = create<WardrobeState>()((set, get) => ({
     const recommendedNames = TAG_RECOMMENDATIONS[key] || [];
     return tags.filter((tag) => recommendedNames.includes(tag.name));
   },
-}));
+}),
+    { storeName: 'WardrobeStore' }
+  )
+);

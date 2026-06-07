@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { UserTransform, TransformCategory, TransformExecution } from '@/types';
 import { generateId } from '@/utils/image';
+import { stateLogger } from '@/monitoring';
 
 interface TransformState {
   userTransforms: UserTransform[];
@@ -24,7 +25,9 @@ interface TransformState {
   removeTransformExecution: (transformId: string) => void;
 }
 
-export const useTransformStore = create<TransformState>()((set, get) => ({
+export const useTransformStore = create<TransformState>()(
+  stateLogger(
+    (set, get) => ({
   userTransforms: [],
   likedTransformIds: [],
   favoritedTransformIds: [],
@@ -181,4 +184,7 @@ export const useTransformStore = create<TransformState>()((set, get) => ({
       transformExecutions: state.transformExecutions.filter((e) => e.transformId !== transformId),
     }));
   },
-}));
+}),
+    { storeName: 'TransformStore' }
+  )
+);
