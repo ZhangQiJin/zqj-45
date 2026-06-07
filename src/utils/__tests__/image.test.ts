@@ -16,12 +16,12 @@ describe('compressImage', () => {
       result: string | ArrayBuffer | null = null;
       error: Error | null = null;
       readyState: number = 0;
-      onload: ((this: FileReader, ev: ProgressEvent<FileReader>) => any) | null = null;
-      onerror: ((this: FileReader, ev: ProgressEvent<FileReader>) => any) | null = null;
-      onabort: ((this: FileReader, ev: ProgressEvent<FileReader>) => any) | null = null;
-      onloadend: ((this: FileReader, ev: ProgressEvent<FileReader>) => any) | null = null;
-      onloadstart: ((this: FileReader, ev: ProgressEvent<FileReader>) => any) | null = null;
-      onprogress: ((this: FileReader, ev: ProgressEvent<FileReader>) => any) | null = null;
+      onload: any = null;
+      onerror: any = null;
+      onabort: any = null;
+      onloadend: any = null;
+      onloadstart: any = null;
+      onprogress: any = null;
 
       readAsDataURL() {
         this.result = 'data:image/jpeg;base64,mockImageData';
@@ -29,7 +29,7 @@ describe('compressImage', () => {
           if (shouldError) {
             this.error = new Error('File read error');
             if (this.onerror) {
-              this.onerror(new Error('File read error') as unknown as ProgressEvent<FileReader>);
+              (this as any).onerror(new Error('File read error'));
             }
           } else {
             const originalImage = window.Image;
@@ -38,8 +38,8 @@ describe('compressImage', () => {
               width: number = 0;
               height: number = 0;
               src: string = '';
-              onload: ((this: GlobalEventHandlers, ev: Event) => any) | null = null;
-              onerror: ((this: GlobalEventHandlers, ev: Event) => any) | null = null;
+              onload: any = null;
+              onerror: any = null;
 
               constructor() {
                 setTimeout(() => {
@@ -47,11 +47,11 @@ describe('compressImage', () => {
                   this.height = imgHeight;
                   if (imgShouldError) {
                     if (this.onerror) {
-                      this.onerror(new Error('Image load error') as unknown as Event);
+                      (this as any).onerror(new Error('Image load error'));
                     }
                   } else {
                     if (this.onload) {
-                      this.onload({} as Event);
+                      (this as any).onload({});
                     }
                   }
                 }, 0);
@@ -61,7 +61,7 @@ describe('compressImage', () => {
             (window as any).Image = MockImage;
             
             if (this.onload) {
-              this.onload({ target: { result: this.result } } as ProgressEvent<FileReader>);
+              (this as any).onload({ target: { result: this.result } });
             }
             
             (window as any).Image = originalImage;
@@ -70,7 +70,7 @@ describe('compressImage', () => {
       }
 
       abort() {}
-    } as unknown as typeof FileReader;
+    } as any;
   };
 
   beforeEach(() => {

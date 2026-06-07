@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest';
+import { vi } from 'vitest';
 
 Object.defineProperty(HTMLCanvasElement.prototype, 'toDataURL', {
   value: function (_type: string, _quality: number) {
